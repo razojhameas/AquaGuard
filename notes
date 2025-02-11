@@ -1,0 +1,75 @@
+Here are the step-by-step instructions to create a React Native app with MongoDB and Expo:
+
+Step 1: Install Node.js and npm
+
+Go to the Node.js website (https://nodejs.org/en/download/) and download the latest version of Node.js for your operating system.
+Follow the installation instructions to install Node.js and npm (the package manager for Node.js).
+Step 2: Install Expo
+
+Open a terminal or command prompt and run the following command: npm install -g expo-cli
+This will install the Expo CLI (Command-Line Interface) globally on your system.
+Step 3: Create a new Expo project
+
+Run the following command: expo init WaterQualityApp
+Follow the prompts to choose a template (e.g., "blank" or "tabs") and choose a name for your app (e.g., "WaterQualityApp").
+This will create a new Expo project in a directory called "WaterQualityApp".
+Step 4: Install required packages
+
+Open the "WaterQualityApp" directory in your terminal or command prompt.
+Run the following commands to install the required packages:
+npm install express
+npm install mongodb
+npm install node-cron
+npm install axios
+npm install react-native-svg
+Step 5: Create a MongoDB database
+
+Go to the MongoDB website (https://www.mongodb.com/) and create a free account.
+Follow the instructions to create a new MongoDB database.
+Note down the database URL, username, and password.
+
+
+
+Step 6: Create a server-side API
+
+Create a new file called "server.js" in the "WaterQualityApp" directory.
+Copy and paste the server-side code I provided earlier into this file.
+Update the MongoDB database URL, username, and password in the code.
+Step 7: Create a client-side app
+
+Create a new file called "WaterQualityPage.js" in the "WaterQualityApp" directory.
+Copy and paste the client-side code I provided earlier into this file.
+Update the API endpoint URLs to point to your server-side API.
+Step 8: Start the server-side API
+
+Run the following command: node server.js
+This will start the server-side API and make it available at http://localhost:8081.
+Step 9: Start the Expo app
+
+Run the following command: expo start
+This will start the Expo app and make it available at http://localhost:19002.
+Step 10: Test the app
+
+Open a web browser and navigate to http://localhost:19002.
+You should see the Water Quality app with a table and graph.
+Click on the "View Details" buttons to navigate to the individual parameter details screens.
+That's it! You should now have a working React Native app with MongoDB and Expo.
+
+
+
+
+
+
+
+
+
+
+
+To implement the server and make it work with the Arduino and app, you'll need to complete the following steps:
+
+Create a MongoDB database: Since you're using Mongoose, you'll need to create a MongoDB database to store the data. You can use a local MongoDB instance or a cloud-based service like MongoDB Atlas.
+Set up the server: You've already created the Express.js server, but you'll need to configure it to listen for incoming requests from the Arduino and app. Make sure to update the arduino-ip-address placeholders in the code with the actual IP address of your Arduino board.
+Implement API endpoints: You've defined some API endpoints, but you'll need to implement the logic for each endpoint. For example, when the app sends a request to /api/start-feeding, the server should forward the request to the Arduino and then update the Feeding model in the database.
+Connect the Arduino to the server: You'll need to modify the Arduino code to send requests to the server when it receives commands from the app. You can use the WiFiClient library to send HTTP requests to the server.
+Implement authentication and authorization: To ensure that only authorized devices can send requests to the server, you'll need to implement authentication and authorization mechanisms. You can use JSON Web Tokens (JWT) or another authentication library to secure your API.
+Test the system: Once you've implemented the server, Arduino, and app, test the system to ensure that data is being sent correctly and that the server is updating the database accordingly.
