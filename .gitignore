@@ -29,7 +29,17 @@ yarn-error.*
 *.pem
 
 # local env files
+.env*
 .env*.local
 
 # typescript
 *.tsbuildinfo
+
+# Sensitive and personal files/folders
+mga text/
+account details
+appdetails
+*.log
+
+# VSCode
+.vscode/

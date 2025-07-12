@@ -1,0 +1,320 @@
+#include <DS1307RTC.h>
+#include <ESP32Servo.h>
+#include <TimeLib.h>
+#include <Wire.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
+
+#define RTC_SDA_PIN 4
+#define RTC_SCL_PIN 10
+#define SERVO_MOTOR_PIN 17
+#define MOTOR_R_EN 23 // DC Motor 1
+#define MOTOR_L_EN 22 // DC Motor 2
+#define MOTOR_R_PWM 12 // DC Motor 1 PWM Channel
+#define MOTOR_L_PWM 13 // DC Motor 2 PWM Channel
+
+DS1307RTC rtc;
+Servo servoMotor;
+
+float previousWeight = 0; // starts previous weight with 0
+
+int lastDispensedDay = -1;
+int lastDispensedHour = -1;
+
+int dutyCycle = 2048; // 50% Power
+
+const char* ssid = "YOUR_SSID";
+const char* password = "YOUR_PASSWORD";
+
+// Set this to your server's IP address or hostname
+const char* serverName = "http://<YOUR_SERVER_IP>:3000";
+
+unsigned long accuracyStartTime = 0;
+int accuracyStep = 0;
+bool accuracyStarted = false;
+
+// Simulated sensor values (replace with actual sensor readings)
+float getTemperature() { return 25.0 + random(-10, 10) * 0.1; }
+float getPH() { return 7.0 + random(-10, 10) * 0.01; }
+float getTDS() { return 350.0 + random(-50, 50); }
+float getDO() { return 6.5 + random(-10, 10) * 0.05; }
+float getAmmonia() { return 0.2 + random(-5, 5) * 0.01; }
+float getTurbidity() { return 7.0 + random(-10, 10) * 0.1; }
+float getWeight() { return 100.0 + random(-20, 20); } // Simulated
+
+void setup() {
+  Serial.begin(9600);
+  Wire.begin(RTC_SDA_PIN, RTC_SCL_PIN);
+
+  // WI-FI setup
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println();
+  Serial.println("WiFi connected.");
+
+  // DC Motor setup
+  pinMode(MOTOR_R_EN, OUTPUT);
+  pinMode(MOTOR_L_EN, OUTPUT);
+  pinMode(MOTOR_R_PWM, OUTPUT);
+  pinMode(MOTOR_L_PWM, OUTPUT);
+
+  digitalWrite(MOTOR_R_EN, HIGH); // Enable motor driver
+  digitalWrite(MOTOR_L_EN, HIGH);
+
+  // RPM Setup
+  ledcSetup(12, 20000, 12); // Channel 12, 20 kHz, 12-bit PWM
+  ledcAttachPin(MOTOR_R_PWM, 12);
+  ledcSetup(13, 20000, 12);
+  ledcAttachPin(MOTOR_L_PWM, 13);
+
+  // RTC setup
+  setSyncProvider(rtc.get);
+  if (timeStatus() != timeSet) {
+    Serial.println("Unable to sync with the RTC");
+  } else {
+    Serial.println("RTC synced successfully.");
+  }
+
+  servoMotor.attach(SERVO_MOTOR_PIN);  // attach servo motor to GPIO pin
+  servoMotor.write(0);  // initialize servo to 0 degrees
+
+  // Send initial sensor data to server
+  sendSensorData();
+  sendWeightData();
+}
+
+void sendSensorData() {
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    String url = String(serverName) + "/api/data";
+    http.begin(url);
+    http.addHeader("Content-Type", "application/json");
+
+    String payload = "{";
+    payload += "\"temperature\":" + String(getTemperature(), 2) + ",";
+    payload += "\"pH\":" + String(getPH(), 2) + ",";
+    payload += "\"tds\":" + String(getTDS(), 2) + ",";
+    payload += "\"doConcentration\":" + String(getDO(), 2) + ",";
+    payload += "\"ammoniaLevel\":" + String(getAmmonia(), 2) + ",";
+    payload += "\"turbidityLevel\":" + String(getTurbidity(), 2);
+    payload += "}";
+
+    int httpResponseCode = http.POST(payload);
+    Serial.print("[Sensor] HTTP Response code: ");
+    Serial.println(httpResponseCode);
+
+    http.end();
+  } else {
+    Serial.println("[Sensor] WiFi not connected.");
+  }
+}
+
+void sendWeightData() {
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    String url = String(serverName) + "/api/weight";
+    http.begin(url);
+    http.addHeader("Content-Type", "application/json");
+
+    float weight = getWeight();
+    String payload = "{\"weight\":" + String(weight, 2) + "}";
+
+    int httpResponseCode = http.POST(payload);
+    Serial.print("[Weight] HTTP Response code: ");
+    Serial.println(httpResponseCode);
+
+    http.end();
+  } else {
+    Serial.println("[Weight] WiFi not connected.");
+  }
+}
+
+void stopMotor() {
+  ledcWrite(MOTOR_R_PWM, 0);
+  ledcWrite(MOTOR_L_PWM, 0);
+}
+
+void rotateMotor(bool clockwise) {
+  if (clockwise) {
+    ledcWrite(MOTOR_R_PWM, 4095);  // full speed right
+    ledcWrite(MOTOR_L_PWM, 0);
+  } else {
+    ledcWrite(MOTOR_R_PWM, 0);
+    ledcWrite(MOTOR_L_PWM, 4095); // full speed left
+  }
+  delay(2000);
+  stopMotor();
+}
+
+void openServo(bool isRunning) {
+  do {
+    servoMotor.write(0);
+    delay(5000);
+    servoMotor.write(180);
+    delay(10000);
+  } while (isRunning);
+  if (!isRunning) {
+    servoMotor.write(0);
+  }
+}
+
+void runDCmotor(bool isRunning) {
+  do {
+    rotateMotor(true);
+    delay(100);
+    rotateMotor(false);
+    delay(100);
+  } while (isRunning);
+  if (!isRunning) {
+    stopMotor();
+  }
+}
+
+void dispenseFeedandMonitor(bool isRunning) { // function to dispense feed, calculate and record weight
+  if (isRunning) {
+    openServo(true);
+    static bool clockwise = true;
+    runDCmotor(true);
+
+    Serial.print("Dispense Time: ");
+    printCurrentTime();
+    Serial.println();
+
+    // Send weight data to server after dispensing
+    sendWeightData();
+  } else {
+    openServo(false);
+    runDCmotor(false);
+  }
+}
+
+void controlledSpread() {
+  dutyCycle = 164; // 600 RPM
+  ledcWrite(12, dutyCycle);
+  ledcWrite(13, dutyCycle);
+  rotateMotor(true);
+  delay(30000);
+  rotateMotor(false);
+  delay(30000);
+  stopMotor();
+}
+
+void highSpread() {
+  dutyCycle = 273; // 1000 RPM
+  ledcWrite(12, dutyCycle);
+  ledcWrite(13, dutyCycle);
+  rotateMotor(true);
+  delay(30000);
+  rotateMotor(false);
+  delay(30000);
+  stopMotor();
+}
+
+void spreadFeed() {
+  controlledSpread();
+  delay(5000); // Pause for 5 Seconds
+  highSpread();
+  delay(5000); // Pause for 5 Seconds
+}
+
+String getTimeString() {  // Date and Time Dispensed for Webhook
+  char buffer[30];
+  sprintf(buffer, "%04d-%02d-%02d %02d:%02d:%02d",
+          year(), month(), day(),
+          hour(), minute(), second());
+  return String(buffer);
+}
+
+void printCurrentTime() {  // Time Dispensed for Serial
+  char buffer[20];
+  sprintf(buffer, "%02d:%02d:%02d", hour(), minute(), second());
+  Serial.print(buffer);
+}
+
+void loop() {
+  static unsigned long lastReadTime = 0;
+  unsigned long currentTime = millis();
+
+  // Send sensor data every 1 minute
+  if (currentTime - lastReadTime >= 60000) {
+    lastReadTime = currentTime;
+
+    int currentDay = day();
+    int currentHour = hour();
+    int currentMinute = minute();
+
+    // Send sensor data to server
+    sendSensorData();
+
+    // Avoid repeating in the same hour
+    if (currentDay == lastDispensedDay && currentHour == lastDispensedHour) {
+      return;
+    }
+
+    // Reliability: Day 1 to 7, dispense once at 6:00 AM
+    if (currentDay <= 7 && currentHour == 6 && currentMinute == 0) {
+      dispenseFeedandMonitor(true);
+      delay(30000);
+      dispenseFeedandMonitor(false);
+      lastDispensedDay = currentDay;
+      lastDispensedHour = currentHour;
+    }
+
+    // Accuracy schedule: Days 8 (Spread)
+    if (currentDay == 8) { // day 8
+      unsigned long now = millis();
+
+      if (!accuracyStarted) {
+        accuracyStartTime = now;
+        accuracyStep = 0;
+        accuracyStarted = true;
+        Serial.println("Day 8 accuracy feeding started");
+      }
+
+      // Step 0: wait 5 minutes before anything else
+      if (accuracyStep == 0 && now - accuracyStartTime >= 300000) { // 5 min
+        dispenseFeedandMonitor(true);
+        spreadFeed();
+        spreadFeed();
+        accuracyStep = 1;
+        accuracyStartTime = now;
+      }
+
+      // Step 1: 2x spread for 300g
+      else if (accuracyStep == 1 && now - accuracyStartTime >= 10000) { // ~10 sec buffer
+        dispenseFeedandMonitor(true);
+        spreadFeed();
+        spreadFeed();
+        accuracyStep = 2;
+        accuracyStartTime = now;
+      }
+
+      // Step 2: final 500g + controlled spread
+      else if (accuracyStep == 2 && now - accuracyStartTime >= 10000) {
+        dispenseFeedandMonitor(true);
+        spreadFeed();
+        controlledSpread();
+        accuracyStep = 3;
+        accuracyStartTime = now;
+      }
+
+      // Done
+      else if (accuracyStep == 3) {
+        Serial.println("Day 8 accuracy feeding completed");
+      }
+    }
+
+    // Accuracy: Day 9-11 (Time)
+    if (currentDay >= 9 && currentDay <= 11) { // day 10-12
+      if ((currentHour >= 6 && currentHour <= 21) && (currentHour % 3 == 0) && currentMinute == 0) { // dispenses from 6am to 9pm every 3 hours
+        dispenseFeedandMonitor(true);
+        delay(30000); // 30 seconds
+        servoMotor.write(0);
+      }
+    }
+  }
+}

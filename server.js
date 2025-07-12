@@ -1,197 +1,156 @@
 const express = require("express");
-const app = express();
 const mongoose = require("mongoose");
-const bodyParser = require("body-parser");
-const axios = require("axios");
 const cors = require("cors");
 
-// Connect to MongoDB
+const app = express();
+app.use(express.json());
+app.use(cors());
+
 mongoose.connect(
-  "mongodb+srv://razojhames8:QTQUOaIOPR3TrA1W@cluster0.2atsy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0",
-  {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  }
+  "mongodb+srv://razojhames8:TubigDSTF25@cluster0.2atsy.mongodb.net/mydatabase?retryWrites=true&w=majority&appName=Cluster0"
 );
 
 mongoose.connection.on("connected", () => {
-  console.log("konekted to mongodb - gumana na omg letsgo what  a skibid");
+  console.log("Connected to MongoDB Atlas");
 });
-
 mongoose.connection.on("error", (err) => {
-  console.error("Error connecting to MongoDB:", err);
+  console.error("MongoDB connection error:", err);
 });
 
+//gawa schemas at models para sa bawat collection
 const waterQualitySchema = new mongoose.Schema({
-  timestamp: Date,
+  timestamp: { type: Date, default: Date.now },
   temperature: Number,
   pH: Number,
   tds: Number,
   doConcentration: Number,
   ammoniaLevel: Number,
-  nitrateLevel: Number,
+  turbidityLevel: Number,
 });
-
-// Create the WaterQuality model
 const WaterQuality = mongoose.model("WaterQuality", waterQualitySchema);
 
-// Define the Feeding schema
 const feedingSchema = new mongoose.Schema({
-  timestamp: Date,
+  timestamp: { type: Date, default: Date.now },
   isFeeding: Boolean,
-  rotations: Number, // Add this field
+  rotations: Number,
+  feedType: String, 
+  distributionMode: String, 
 });
-
 const Feeding = mongoose.model("Feeding", feedingSchema);
 
-// Define the AlgaeControl schema
+const feedingToggleSchema = new mongoose.Schema({
+  timestamp: { type: Date, default: Date.now },
+  isFeeding: Boolean,
+});
+const FeedingToggle = mongoose.model("FeedingToggle", feedingToggleSchema);
+
 const algaeControlSchema = new mongoose.Schema({
-  timestamp: Date,
+  timestamp: { type: Date, default: Date.now },
   interval: Number,
 });
-
-// Create the AlgaeControl model
 const AlgaeControl = mongoose.model("AlgaeControl", algaeControlSchema);
 
-// Define the Weight schema
 const weightSchema = new mongoose.Schema({
-  timestamp: Date,
+  timestamp: { type: Date, default: Date.now },
   weight: Number,
 });
-
-// Create the Weight model
 const Weight = mongoose.model("Weight", weightSchema);
 
-// Define the TransducerToggle schema
 const transducerToggleSchema = new mongoose.Schema({
-  timestamp: Date,
+  timestamp: { type: Date, default: Date.now },
   isTransducerOn: Boolean,
 });
+const TransducerToggle = mongoose.model("TransducerToggle", transducerToggleSchema);
 
-// Create the TransducerToggle model
-const TransducerToggle = mongoose.model(
-  "TransducerToggle",
-  transducerToggleSchema
-);
+// --- WATER QUALITY ENDPOINTS --- tralalero tralala
 
-// Use bodyParser to parse JSON requests
-app.use(bodyParser.json());
-
-app.use(cors()); // Add this line
-
-// API endpoint to receive data from Arduino
-app.post("/api/data", (req, res) => {
-  const { temperature, pH, tds, doConcentration, ammoniaLevel, nitrateLevel } =
-    req.body;
-  const now = new Date();
-
-  // Create a new WaterQuality document
-  const waterQualityData = new WaterQuality({
-    timestamp: now,
-    temperature,
-    pH,
-    tds,
-    doConcentration,
-    ammoniaLevel,
-    nitrateLevel,
-  });
-
-  const transducerToggleSchema = new mongoose.Schema({
-    timestamp: Date,
-    isTransducerOn: Boolean,
-  });
-
-  const TransducerToggle = mongoose.model(
-    "TransducerToggle",
-    transducerToggleSchema
-  );
-
-  // Save the document to the database
-  waterQualityData.save((err, doc) => {
-    if (err) {
-      console.error(err);
-      res.status(500).send({ message: "Error saving data" });
-    } else {
-      res.header("Content-Type", "application/json");
-      res.send({ message: "Data saved successfully" });
-    }
-  });
+app.post("/api/data", async (req, res) => {
+  try {
+    const doc = new WaterQuality({ ...req.body, timestamp: new Date() });
+    await doc.save();
+    res.json({ message: "Data saved successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Error saving data" });
+  }
 });
 
-// API endpoint to retrieve weight data
-app.get("/api/weight", (req, res) => {
-  Weight.findOne()
-    .sort({ timestamp: -1 })
-    .then((data) => {
-      if (data) {
-        res.json({ weight: data.weight }); // Return the weight value in JSON format
-      } else {
-        res.status(404).send({ message: "No weight data found" });
-      }
-    })
-    .catch((err) => {
-      console.error(err);
-      res.status(500).send({ message: "Error retrieving weight data" });
+app.get("/api/data/latest", async (req, res) => {
+  try {
+    const latest = await WaterQuality.findOne().sort({ timestamp: -1 });
+    res.json(latest || {});
+  } catch (err) {
+    res.status(500).json({ message: "Error retrieving latest data" });
+  }
+});
+
+app.get("/api/data", async (req, res) => {
+  try {
+    const data = await WaterQuality.find().sort({ timestamp: 1 });
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ message: "Error retrieving data" });
+  }
+});
+
+app.post("/api/data/sample", async (req, res) => {
+  try {
+    const sample = new WaterQuality({
+      timestamp: new Date(),
+      temperature: 25 + Math.random() * 5,
+      pH: 7 + (Math.random() - 0.5),
+      tds: 300 + Math.random() * 100,
+      doConcentration: 6 + Math.random() * 2,
+      ammoniaLevel: 0.1 + Math.random() * 0.5,
+      turbidityLevel: 5 + Math.random() * 5,
     });
+    await sample.save();
+    res.json({ message: "Sample data saved successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Error saving sample data" });
+  }
+});
+
+// --- WEIGHT ENDPOINTS --- tung tung tung sahur
+
+app.get("/api/weight", async (req, res) => {
+  try {
+    const latest = await Weight.findOne().sort({ timestamp: -1 });
+    if (latest) res.json({ weight: latest.weight });
+    else res.status(404).json({ message: "No weight data found" });
+  } catch (err) {
+    res.status(500).json({ message: "Error retrieving weight data" });
+  }
 });
 
 app.post("/api/weight", async (req, res) => {
   try {
-    const { weight } = req.body;
-    const now = new Date();
-
-    // Create a new Weight document
-    const weightData = new Weight({
-      timestamp: now,
-      weight,
-    });
-
-    // Save the document to the database
-    await weightData.save();
-    res.header("Content-Type", "application/json");
-    res.send({ message: "Weight data received and saved successfully" });
-  } catch (error) {
-    console.error(error);
-    res.status(500).send({ message: "Error saving weight data" });
+    const doc = new Weight({ ...req.body, timestamp: new Date() });
+    await doc.save();
+    res.json({ message: "Weight data received and saved successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Error saving weight data" });
   }
 });
 
-app.get("/api/data", (req, res) => {
-  WaterQuality.find()
-    .then((data) => {
-      res.header("Content-Type", "application/json");
-      res.send(data);
-    })
-    .catch((err) => {
-      console.error(err);
-      res.status(500).send({ message: "Error retrieving data" });
-    });
-});
+// --- FEEDING ENDPOINTS --- ballerina cappucina
 
 app.post("/api/update-rotations", async (req, res) => {
   try {
-    const { rotations } = req.body;
+    const { rotations, feedType, distributionMode } = req.body;
     const now = new Date();
-
-    // Update the Feeding document with the new rotations value
-    const feeding = await Feeding.findOne().sort({ timestamp: -1 });
+    let feeding = await Feeding.findOne().sort({ timestamp: -1 });
     if (!feeding) {
-      // If no document is found, create a new one
-      const newFeeding = new Feeding({
-        timestamp: now,
-        rotations,
-      });
-      await newFeeding.save();
+      feeding = new Feeding({ timestamp: now, rotations, feedType, distributionMode });
     } else {
       feeding.rotations = rotations;
-      await feeding.save();
+      feeding.timestamp = now;
+      if (feedType !== undefined) feeding.feedType = feedType;
+      if (distributionMode !== undefined) feeding.distributionMode = distributionMode;
     }
-
-    res.header("Content-Type", "application/json");
-    res.send({ message: "Rotations updated successfully" });
-  } catch (error) {
-    console.error(error);
-    res.status(500).send({ message: "Error updating rotations" });
+    await feeding.save();
+    res.json({ message: "Rotations (and feed options) updated successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Error updating rotations" });
   }
 });
 
@@ -199,87 +158,285 @@ app.post("/api/update-feeding-state", async (req, res) => {
   try {
     const { isFeeding } = req.body;
     const now = new Date();
-
-    // Update the Feeding document with the new feeding state
-    const feeding = await Feeding.findOne().sort({ timestamp: -1 });
+    let feeding = await Feeding.findOne().sort({ timestamp: -1 });
     if (!feeding) {
-      // If no document is found, create a new one
-      const newFeeding = new Feeding({
-        timestamp: now,
-        isFeeding,
-      });
-      await newFeeding.save();
+      feeding = new Feeding({ timestamp: now, isFeeding });
     } else {
       feeding.isFeeding = isFeeding;
-      await feeding.save();
+      feeding.timestamp = now;
     }
-
-    res.header("Content-Type", "application/json");
-    res.send({ message: "Feeding state updated successfully" });
-  } catch (error) {
-    console.error(error);
-    res.status(500).send({ message: "Error updating feeding state" });
+    await feeding.save();
+    res.json({ message: "Feeding state updated successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Error updating feeding state" });
   }
 });
+
+app.get("/api/rotations", async (req, res) => {
+  try {
+    const latest = await Feeding.findOne().sort({ timestamp: -1 });
+    res.json({ rotations: latest?.rotations ?? 6 });
+  } catch (err) {
+    res.status(500).json({ message: "Error retrieving rotations" });
+  }
+});
+
+app.get("/api/feedtype", async (req, res) => {
+  try {
+    const latest = await Feeding.findOne().sort({ timestamp: -1 });
+    res.json({ feedType: latest?.feedType ?? "" });
+  } catch (err) {
+    res.status(500).json({ message: "Error retrieving feed type" });
+  }
+});
+
+app.post("/api/feedtype", async (req, res) => {
+  try {
+    const { feedType } = req.body;
+    const now = new Date();
+    let feeding = await Feeding.findOne().sort({ timestamp: -1 });
+    if (!feeding) {
+      feeding = new Feeding({ timestamp: now, feedType });
+    } else {
+      feeding.feedType = feedType;
+      feeding.timestamp = now;
+    }
+    await feeding.save();
+    res.json({ message: "Feed type updated successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Error updating feed type" });
+  }
+});
+
+app.get("/api/distributionmode", async (req, res) => {
+  try {
+    const latest = await Feeding.findOne().sort({ timestamp: -1 });
+    res.json({ distributionMode: latest?.distributionMode ?? "" });
+  } catch (err) {
+    res.status(500).json({ message: "Error retrieving distribution mode" });
+  }
+});
+
+app.post("/api/distributionmode", async (req, res) => {
+  try {
+    const { distributionMode } = req.body;
+    const now = new Date();
+    let feeding = await Feeding.findOne().sort({ timestamp: -1 });
+    if (!feeding) {
+      feeding = new Feeding({ timestamp: now, distributionMode });
+    } else {
+      feeding.distributionMode = distributionMode;
+      feeding.timestamp = now;
+    }
+    await feeding.save();
+    res.json({ message: "Distribution mode updated successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Error updating distribution mode" });
+  }
+});
+
+// --- FEEDING TOGGLE ENDPOINTS ---
+
+app.get("/api/feedingtoggle", async (req, res) => {
+  try {
+    const latest = await FeedingToggle.findOne().sort({ timestamp: -1 });
+    res.json({ isFeeding: latest?.isFeeding ?? false });
+  } catch (err) {
+    res.status(500).json({ message: "Error retrieving feeding toggle state" });
+  }
+});
+
+app.post("/api/feedingtoggle", async (req, res) => {
+  try {
+    const { isFeeding } = req.body;
+    const doc = new FeedingToggle({ isFeeding, timestamp: new Date() });
+    await doc.save();
+    res.json({ message: "Feeding toggle state updated successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Error updating feeding toggle state" });
+  }
+});
+
+// --- ALGAE CONTROL ENDPOINTS ---
 
 app.post("/api/update-interval", async (req, res) => {
   try {
     const { interval } = req.body;
     const now = new Date();
-
-    // Update the AlgaeControl document with the new interval value
-    const algaeControl = await AlgaeControl.findOne().sort({ timestamp: -1 });
-    if (!algaeControl) {
-      // If no document is found, create a new one
-      const newAlgaeControl = new AlgaeControl({
-        timestamp: now,
-        interval,
-      });
-      await newAlgaeControl.save();
+    let algae = await AlgaeControl.findOne().sort({ timestamp: -1 });
+    if (!algae) {
+      algae = new AlgaeControl({ timestamp: now, interval });
     } else {
-      algaeControl.interval = interval;
-      await algaeControl.save();
+      algae.interval = interval;
+      algae.timestamp = now;
     }
-
-    res.header("Content-Type", "application/json");
-    res.send({ message: "Interval updated successfully" });
-  } catch (error) {
-    console.error(error);
-    res.status(500).send({ message: "Error updating interval" });
+    await algae.save();
+    res.json({ message: "Interval updated successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Error updating interval" });
   }
 });
+
+// --- ALGAE CONTROL INTERVAL ENDPOINTS ---
+
+app.get("/api/interval", async (req, res) => {
+  try {
+    const latest = await AlgaeControl.findOne().sort({ timestamp: -1 });
+    res.json({ interval: latest?.interval ?? 0 });
+  } catch (err) {
+    res.status(500).json({ message: "Error retrieving interval" });
+  }
+});
+
+app.post("/api/interval", async (req, res) => {
+  try {
+    const { interval } = req.body;
+    const now = new Date();
+    let algae = await AlgaeControl.findOne().sort({ timestamp: -1 });
+    if (!algae) {
+      algae = new AlgaeControl({ timestamp: now, interval });
+    } else {
+      algae.interval = interval;
+      algae.timestamp = now;
+    }
+    await algae.save();
+    res.json({ message: "Interval updated successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Error updating interval" });
+  }
+});
+
+// --- TRANSDUCER ENDPOINTS ---
 
 app.post("/api/update-transducer-state", async (req, res) => {
   try {
     const { isTransducerOn } = req.body;
     const now = new Date();
-
-    // Update the TransducerToggle document with the new transducer state
-    const transducerToggle = await TransducerToggle.findOne().sort({
-      timestamp: -1,
-    });
-    if (!transducerToggle) {
-      // If no document is found, create a new one
-      const newTransducerToggle = new TransducerToggle({
-        timestamp: now,
-        isTransducerOn,
-      });
-      await newTransducerToggle.save();
+    let transducer = await TransducerToggle.findOne().sort({ timestamp: -1 });
+    if (!transducer) {
+      transducer = new TransducerToggle({ timestamp: now, isTransducerOn });
     } else {
-      transducerToggle.isTransducerOn = isTransducerOn;
-      await transducerToggle.save();
+      transducer.isTransducerOn = isTransducerOn;
+      transducer.timestamp = now;
     }
-
-    res.header("Content-Type", "application/json");
-    res.send({ message: "Transducer state updated successfully" });
-  } catch (error) {
-    console.error(error);
-    res.status(500).send({ message: "Error updating transducer state" });
+    await transducer.save();
+    res.json({ message: "Transducer state updated successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Error updating transducer state" });
   }
 });
 
-// Start the server
+// --- TRANSDUCER STATE ENDPOINTS ---
+
+app.get("/api/transducer-state", async (req, res) => {
+  try {
+    const latest = await TransducerToggle.findOne().sort({ timestamp: -1 });
+    res.json({ isTransducerOn: latest?.isTransducerOn ?? false });
+  } catch (err) {
+    res.status(500).json({ message: "Error retrieving transducer state" });
+  }
+});
+
+app.post("/api/transducer-state", async (req, res) => {
+  try {
+    const { isTransducerOn } = req.body;
+    const now = new Date();
+    let transducer = await TransducerToggle.findOne().sort({ timestamp: -1 });
+    if (!transducer) {
+      transducer = new TransducerToggle({ timestamp: now, isTransducerOn });
+    } else {
+      transducer.isTransducerOn = isTransducerOn;
+      transducer.timestamp = now;
+    }
+    await transducer.save();
+    res.json({ message: "Transducer state updated successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Error updating transducer state" });
+  }
+});
+
+// --- SAMPLE DATA FOR ALL COLLECTIONS --- temporary lang to kasi wala pang actual data collection
+
+async function insertSampleDataAll() {
+  // WaterQuality sample
+  const waterSample = new WaterQuality({
+    timestamp: new Date(),
+    temperature: 25 + Math.random() * 5,
+    pH: 7 + (Math.random() - 0.5),
+    tds: 300 + Math.random() * 100,
+    doConcentration: 6 + Math.random() * 2,
+    ammoniaLevel: 0.1 + Math.random() * 0.5,
+    turbidityLevel: 5 + Math.random() * 5,
+  });
+  console.log("[Sample] WaterQuality:", waterSample.toObject());
+  await waterSample.save();
+
+  const weightSample = new Weight({
+    timestamp: new Date(),
+    weight: Math.floor(Math.random() * 100) + 1,
+  });
+  console.log("[Sample] Weight:", weightSample.toObject());
+  await weightSample.save();
+}
+
+app.post("/api/sample/all", async (req, res) => {
+  try {
+    await insertSampleDataAll();
+    res.json({ message: "Sample data added to all collections" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error adding sample data to all collections" });
+  }
+});
+
+app.get("/api/sample/all", async (req, res) => {
+  try {
+    await insertSampleDataAll();
+    res.json({ message: "Sample data added to all collections (GET)" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error adding sample data to all collections (GET)" });
+  }
+});
+
+// --- SERVER START ---
 const port = 3000;
-app.listen(port, () => {
+app.listen(port, "0.0.0.0", async () => {
   console.log(`Server started on port ${port}`);
+  try {
+    await insertSampleDataAll();
+    console.log("[Startup] Sample data inserted into all collections.");
+  } catch (err) {
+    console.error("[Startup] Error inserting sample data:", err);
+  }
+  setInterval(async () => {
+    try {
+      await insertSampleDataAll();
+      console.log("[Interval] Sample data inserted into all collections.");
+    } catch (err) {
+      console.error("[Interval] Error inserting sample data:", err);
+    }
+  }, 3000);
+});
+
+app.get("/api/export", async (req, res) => {
+  try {
+    const waterQuality = await WaterQuality.find().sort({ timestamp: 1 });
+    const feeding = await Feeding.find().sort({ timestamp: 1 });
+    const feedingToggle = await FeedingToggle.find().sort({ timestamp: 1 });
+    const algaeControl = await AlgaeControl.find().sort({ timestamp: 1 });
+    const weight = await Weight.find().sort({ timestamp: 1 });
+    const transducerToggle = await TransducerToggle.find().sort({ timestamp: 1 });
+
+    res.json({
+      water_quality_data: waterQuality,
+      feeding_logs: feeding,
+      feeding_toggle_logs: feedingToggle,
+      algae_control_logs: algaeControl,
+      weight_logs: weight,
+      transducer_toggle_logs: transducerToggle
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Error exporting data", error: err.message });
+  }
 });
