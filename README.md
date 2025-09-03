@@ -19,6 +19,7 @@ INSTALLING DEPENDENCIES
 START 
 
 	run in terminal: npx expo start
+ 	isa pang terminal: node utils/server.js 
 
 IF ERROR IN DEPENDENCIES
 
