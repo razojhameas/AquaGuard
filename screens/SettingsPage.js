@@ -461,7 +461,7 @@ export default function SettingsPage({ navigation, language, setLanguage, settin
     setSettings((prevSettings) => ({
       ...prevSettings,
       notificationsEnabled: true,
-      apiEndpoint: "http://localhost:3000",
+      apiEndpoint: "http://192.168.18.5:3000",
     }));
     setImportExportMsg(language === "English" ? "Settings reset to default." : "Nareset sa default ang mga setting.");
   };
@@ -489,7 +489,7 @@ export default function SettingsPage({ navigation, language, setLanguage, settin
         </TouchableOpacity>
 
         <Image
-          source={require("../assets/setting.png")}
+          source={require("../assets/Setting.png")}
           style={{
             marginBottom: 20,
             width: 70,
