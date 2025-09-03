@@ -19,7 +19,7 @@ INSTALLING DEPENDENCIES
 START 
 
 	run in terminal: npx expo start
- 	isa pang terminal: node utils/server.js 
+	open another terminal, run: node utils/server.js 
 
 IF ERROR IN DEPENDENCIES
 
@@ -27,3 +27,10 @@ IF ERROR IN DEPENDENCIES
 
 		npm cache clean --force
 		npm install
+
+IP ADDRESS:
+
+	open cmd, run: ipconfig
+	replace lahat ng http requests with the ipv4 address (ALL FILES), 
+	http://{ipv4 address}:3000
+
