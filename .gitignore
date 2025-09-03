@@ -39,6 +39,7 @@ yarn-error.*
 mga text/
 account details
 appdetails
+update
 *.log
 
 # VSCode
