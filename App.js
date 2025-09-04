@@ -5,13 +5,11 @@ import { createStackNavigator } from "@react-navigation/stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 
-// Import screen components
-// Removed StartingPage and LanguageSelection imports
 import DashboardPage from "./screens/DashboardPage";
 import WaterQualityPage from "./screens/WaterQualityPage";
 import AutomatedFeedingPage from "./screens/AutomatedFeedingPage";
 import SettingsPage from "./screens/SettingsPage";
-import ParameterDetails from "./screens/details/ParameterDetails"; // The single, dynamic details page
+import ParameterDetails from "./screens/details/ParameterDetails"; 
 
 AppRegistry.registerComponent("main", () => App);
 

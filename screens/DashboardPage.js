@@ -106,7 +106,6 @@ const styles = StyleSheet.create({
   dataValue: {
     fontSize: 17,
     fontWeight: "bold",
-    // color dynamically set
     letterSpacing: 0.2,
   },
   statusIndicator: {
@@ -118,7 +117,6 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 17,
     fontWeight: "bold",
-    // color dynamically set
   },
   lastUpdated: {
     fontSize: 13,
@@ -178,46 +176,44 @@ const styles = StyleSheet.create({
   },
 });
 
-// Helper functions for color coding
-
 const getDOSIColor = (dosi) => {
   if (dosi === undefined || dosi === null) return "#888";
-  if (dosi > 0.8) return "#b71c1c"; // Critical - red
-  if (dosi > 0.6) return "#e65100"; // High Risk - orange
-  if (dosi > 0.3) return "#f9a825"; // Moderate - yellow
-  return "#009688"; // Safe - green
+  if (dosi > 0.8) return "#b71c1c";
+  if (dosi > 0.6) return "#e65100";
+  if (dosi > 0.3) return "#f9a825";
+  return "#009688";
 };
 
 const getTemperatureColor = (temp) => {
   if (temp === undefined || temp === null || isNaN(temp)) return "#888";
-  if (temp < 18 || temp > 37) return "#b71c1c"; // Extreme - red
-  if ((temp >= 18 && temp < 22) || (temp > 35 && temp <= 37)) return "#e65100"; // Significant deviation - orange
-  if ((temp >= 22 && temp < 26) || (temp > 32 && temp <= 35)) return "#f9a825"; // Slight deviation - yellow
-  return "#009688"; // Optimal range - green
+  if (temp < 18 || temp > 37) return "#b71c1c";
+  if ((temp >= 18 && temp < 22) || (temp > 35 && temp <= 37)) return "#e65100";
+  if ((temp >= 22 && temp < 26) || (temp > 32 && temp <= 35)) return "#f9a825";
+  return "#009688";
 };
 
 const getPHColor = (pH) => {
   if (pH === undefined || pH === null || isNaN(pH)) return "#888";
-  if (pH < 4.5 || pH > 10.5) return "#b71c1c"; // Bad - red
-  if ((pH >= 4.5 && pH < 5.5) || (pH > 9.1 && pH <= 10.5)) return "#e65100"; // Poor - orange
-  if ((pH >= 5.5 && pH < 6.5) || (pH > 8.5 && pH <= 9.1)) return "#f9a825"; // Moderate - yellow
-  return "#009688"; // Good - green
+  if (pH < 4.5 || pH > 10.5) return "#b71c1c";
+  if ((pH >= 4.5 && pH < 5.5) || (pH > 9.1 && pH <= 10.5)) return "#e65100";
+  if ((pH >= 5.5 && pH < 6.5) || (pH > 8.5 && pH <= 9.1)) return "#f9a825";
+  return "#009688";
 };
 
 const getAmmoniaColor = (ammonia) => {
   if (ammonia === undefined || ammonia === null || isNaN(ammonia)) return "#888";
-  if (ammonia > 0.1) return "#b71c1c"; // Critical - red
-  if (ammonia > 0.05) return "#e65100"; // High risk - orange
-  if (ammonia > 0.02) return "#f9a825"; // Slight risk - yellow
-  return "#009688"; // Safe - green
+  if (ammonia > 0.1) return "#b71c1c";
+  if (ammonia > 0.05) return "#e65100";
+  if (ammonia > 0.02) return "#f9a825";
+  return "#009688";
 };
 
 const getTurbidityColor = (turbidity) => {
   if (turbidity === undefined || turbidity === null || isNaN(turbidity)) return "#888";
-  if (turbidity > 50) return "#b71c1c"; // Critical - red
-  if (turbidity > 20) return "#e65100"; // High risk - orange
-  if (turbidity > 5) return "#f9a825"; // Moderate - yellow
-  return "#009688"; // Safe - green
+  if (turbidity > 50) return "#b71c1c";
+  if (turbidity > 20) return "#e65100";
+  if (turbidity > 5) return "#f9a825";
+  return "#009688";
 };
 
 export default function DashboardPage({ language, navigation }) {
@@ -229,12 +225,10 @@ export default function DashboardPage({ language, navigation }) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch latest water quality data
       const waterRes = await fetch("http://192.168.18.5:3000/api/data/latest");
       const waterData = await waterRes.json();
       setLatestWaterQuality(waterData);
 
-      // Fetch feeding statistics
       const statsRes = await fetch("http://192.168.18.5:3000/api/feeding-stats");
       const statsData = await statsRes.json();
       setFeedingStats(statsData);
@@ -284,8 +278,6 @@ export default function DashboardPage({ language, navigation }) {
     }, [])
   );
 
-  // Color helpers already defined in Part 1
-
   return (
     <View style={styles.dashboardPage}>
       <View style={styles.bubble1} />
@@ -308,21 +300,19 @@ export default function DashboardPage({ language, navigation }) {
         <View style={styles.glassCard}>
           <Text style={styles.header}>AquaGUARD</Text>
           <Text style={styles.subHeader}>
-            {language === "English" ? "System Dashboard" : "Dashboard ng Sistema"}
+            {language === "English" ? "System Dashboard" : "Dashboard ng Sistema (clunky pa translations google translate na lang muna, need pa kasi ng langauge expert consulation para formal e wala pa)"}
           </Text>
 
           {loading ? (
             <ActivityIndicator size="large" color="#00796b" />
           ) : (
             <>
-              {/* Water Quality Summary */}
               <View style={styles.cardSection}>
                 <Text style={styles.cardSectionTitle}>
                   {language === "English" ? "Water Quality" : "Kalidad ng Tubig"}
                 </Text>
                 {latestWaterQuality && latestWaterQuality.timestamp ? (
                   <View style={styles.cardSectionContent}>
-                    {/* DO-SI on top */}
                     <View style={[styles.dataRow, { alignItems: "center" }]}>
                       <Text style={styles.dataLabel}>DO-SI:</Text>
                       <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -345,7 +335,6 @@ export default function DashboardPage({ language, navigation }) {
                       </View>
                     </View>
 
-                    {/* Temperature */}
                     <View style={styles.dataRow}>
                       <Text style={styles.dataLabel}>
                         {language === "English" ? "Temperature:" : "Temperatura:"}
@@ -360,7 +349,6 @@ export default function DashboardPage({ language, navigation }) {
                       </Text>
                     </View>
 
-                    {/* pH */}
                     <View style={styles.dataRow}>
                       <Text style={styles.dataLabel}>pH:</Text>
                       <Text
@@ -373,7 +361,6 @@ export default function DashboardPage({ language, navigation }) {
                       </Text>
                     </View>
 
-                    {/* Ammonia */}
                     <View style={styles.dataRow}>
                       <Text style={styles.dataLabel}>
                         {language === "English" ? "Ammonia:" : "Amonya:"}
@@ -388,7 +375,6 @@ export default function DashboardPage({ language, navigation }) {
                       </Text>
                     </View>
 
-                    {/* Turbidity */}
                     <View style={styles.dataRow}>
                       <Text style={styles.dataLabel}>
                         {language === "English" ? "Turbidity:" : "Kakuliman:"}
@@ -416,7 +402,6 @@ export default function DashboardPage({ language, navigation }) {
                   </Text>
                 )}
               </View>
-              {/* Feeding Summary */}
               <View style={styles.cardSection}>
                 <Text style={styles.cardSectionTitle}>
                   {language === "English" ? "Feeding System" : "Sistema ng Pagpapakain"}

@@ -17,13 +17,13 @@ mongoose.connection.on("error", (err) => {
   console.error("MongoDB connection error:", err);
 });
 
-// helper para sa logging
+// Helper for logging
 const log = (message, data) => {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}] ${message}`, data ? JSON.stringify(data) : "");
 };
 
-// schemas
+// --- Mongoose Schemas ---
 const waterQualitySchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
   temperature: Number,
@@ -60,7 +60,7 @@ const weightSchema = new mongoose.Schema({
 });
 const Weight = mongoose.model("Weight", weightSchema);
 
-// helpers
+// --- Helper Functions ---
 const convertTo12HourFormat = (time24) => {
   if (!time24) return null;
   const [hours, minutes] = time24.split(":");
@@ -94,9 +94,9 @@ const updateFeedingStats = async () => {
   }
 };
 
-// ---------------------------------- mga API Endpoints ---------------------------------- //
+// --- API Endpoints ---
 
-// water quality
+// Water Quality Endpoints
 app.post("/api/data", async (req, res) => {
   log("[POST] /api/data", req.body);
   try {
@@ -131,7 +131,7 @@ app.get("/api/data", async (req, res) => {
   }
 });
 
-// weight sensor endpoints (para sa feed amount, still theorethical)
+// Weight Sensor Endpoints
 app.get("/api/weight", async (req, res) => {
   log("[GET] /api/weight");
   try {
@@ -156,7 +156,7 @@ app.post("/api/weight", async (req, res) => {
   }
 });
 
-// feeding system settings
+// Feeding Settings and Control Endpoints
 app.get("/api/rotations", async (req, res) => {
   log("[GET] /api/rotations");
   try {
@@ -268,6 +268,7 @@ app.get("/api/feeding-schedules", async (req, res) => {
   try {
     const latest = await FeedingSettings.findOne().sort({ timestamp: -1 });
     const schedules = latest?.scheduleTimes ?? [];
+    // Return raw 24-hour times to avoid duplication on client
     res.json({ scheduleTimes: schedules });
   } catch (err) {
     console.error("[ERROR] /api/feeding-schedules", err);
@@ -279,6 +280,9 @@ app.post("/api/feeding-schedules", async (req, res) => {
   log("[POST] /api/feeding-schedules", req.body);
   try {
     const { scheduleTimes } = req.body;
+    if (!scheduleTimes || !Array.isArray(scheduleTimes))
+      return res.status(400).json({ message: "Invalid schedule times" });
+
     await FeedingSettings.findOneAndUpdate(
       {},
       { $set: { scheduleTimes, timestamp: new Date() } },
@@ -316,7 +320,7 @@ app.post("/api/feeding-settings", async (req, res) => {
   }
 });
 
-// feed stats
+// Feeding Statistics Endpoint
 app.get("/api/feeding-stats", async (req, res) => {
   log("[GET] /api/feeding-stats");
   try {
@@ -328,9 +332,9 @@ app.get("/api/feeding-stats", async (req, res) => {
   }
 });
 
-// --- demo import pa ig, no implemnted file type restrictions yet ---
+// --- New Import Endpoints ---
 
-// import feeding settings
+// Import feeding settings
 app.post("/api/import/feeding-settings", async (req, res) => {
   log("[POST] /api/import/feeding-settings", req.body);
   try {
@@ -349,7 +353,7 @@ app.post("/api/import/feeding-settings", async (req, res) => {
   }
 });
 
-// import feeding stats
+// Import feeding stats
 app.post("/api/import/feeding-stats", async (req, res) => {
   log("[POST] /api/import/feeding-stats", req.body);
   try {
@@ -368,7 +372,7 @@ app.post("/api/import/feeding-stats", async (req, res) => {
   }
 });
 
-// import feeding scheds
+// Import feeding schedules
 app.post("/api/import/feeding-schedules", async (req, res) => {
   log("[POST] /api/import/feeding-schedules", req.body);
   try {
@@ -388,7 +392,7 @@ app.post("/api/import/feeding-schedules", async (req, res) => {
   }
 });
 
-// import water qual. data
+// Import water quality data
 app.post("/api/import/water-quality", async (req, res) => {
   log("[POST] /api/import/water-quality", req.body);
   try {
@@ -406,7 +410,7 @@ app.post("/api/import/water-quality", async (req, res) => {
   }
 });
 
-// import weight
+// Import weight data
 app.post("/api/import/weight", async (req, res) => {
   log("[POST] /api/import/weight", req.body);
   try {
@@ -422,27 +426,6 @@ app.post("/api/import/weight", async (req, res) => {
     res.status(500).json({ message: "Error importing weight data" });
   }
 });
-
-// --- sample data injection (for testing purposes lang, remove once esp32 code is done and connections at established na ang connections) ---
-async function insertSampleWaterQualityAndWeight() {
-  const waterSample = new WaterQuality({
-    timestamp: new Date(),
-    temperature: 25 + Math.random() * 5,
-    pH: 7 + (Math.random() - 0.5),
-    doConcentration: 6 + Math.random() * 2,
-    ammoniaLevel: 0.1 + Math.random() * 0.5,
-    turbidityLevel: 5 + Math.random() * 5,
-  });
-  log("[Sample] WaterQuality", waterSample.toObject());
-  await waterSample.save();
-
-  const weightSample = new Weight({
-    timestamp: new Date(),
-    weight: Math.floor(Math.random() * 100) + 1,
-  });
-  log("[Sample] Weight", weightSample.toObject());
-  await weightSample.save();
-}
 
 async function initializePersistentData() {
   await FeedingSettings.findOneAndUpdate(
@@ -476,6 +459,7 @@ async function initializePersistentData() {
   );
 }
 
+// --- Server Startup ---
 const port = 3000;
 app.listen(port, "0.0.0.0", async () => {
   log(`Server started on port ${port}`);
@@ -485,18 +469,9 @@ app.listen(port, "0.0.0.0", async () => {
   } catch (err) {
     console.error("[Startup] Error initializing data:", err);
   }
-
-  setInterval(async () => {
-    try {
-      await insertSampleWaterQualityAndWeight();
-      log("[Interval] Sample data inserted for water quality and weight.");
-    } catch (err) {
-      console.error("[Interval] Error inserting sample data:", err);
-    }
-  }, 5000);
 });
 
-// --- data export ganggang ---
+// --- Data Export Endpoint ---
 app.get("/api/export", async (req, res) => {
   log("[GET] /api/export");
   try {

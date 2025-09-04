@@ -408,7 +408,7 @@ export default function AutomatedFeedingPage({ language, settings }) {
 
   const apiEndpoint = settings?.apiEndpoint || "http://192.168.18.5:3000";
 
-  // Helper to check server connection
+  // check serv. conncetion
   const checkServer = async () => {
     try {
       const res = await fetch(`${apiEndpoint}/api/weight`, { method: "GET" });
@@ -454,7 +454,7 @@ export default function AutomatedFeedingPage({ language, settings }) {
     const pattern = /^(?:2[0-3]|[01]?[0-9]):(?:[0-5]?[0-9])$/;
     return pattern.test(time);
   };
-  // Function to fetch all relevant data
+  // fetch all relevant data sigma
   const fetchAllFeedingData = async () => {
     try {
       const [
@@ -496,7 +496,7 @@ export default function AutomatedFeedingPage({ language, settings }) {
       setIsFeedingSystemOn(feedingToggleData.isFeeding ?? false);
 
       const schedulesData = await schedulesRes.json();
-      // On fetch, convert and store the display format
+      // after fetching, convert then display bababababababa
       const formattedSchedules = Array.isArray(schedulesData.scheduleTimes)
         ? schedulesData.scheduleTimes.map((time24) => ({
             time24,

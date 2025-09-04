@@ -489,7 +489,7 @@ export default function SettingsPage({ navigation, language, setLanguage, settin
         </TouchableOpacity>
 
         <Image
-          source={require("../assets/Setting.png")}
+          source={require("../assets/setting.png")}
           style={{
             marginBottom: 20,
             width: 70,

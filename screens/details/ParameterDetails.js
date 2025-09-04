@@ -414,7 +414,7 @@ export default function ParameterDetails({ route, navigation }) {
           median: median,
         });
 
-        // --- Refactored Logic for Chart Data Processing ---
+        // --- refactored logic para sa chart data, recheck later, still slow ---
         let processedData = [];
         if (timeframe === "last24h") {
           const hourlyData = new Map();
@@ -472,8 +472,7 @@ export default function ParameterDetails({ route, navigation }) {
             }))
             .sort((a, b) => a.x - b.x);
         }
-        setData(processedData);
-        // --- End of Refactored Logic ---
+        setData(processedData)
       } catch (e) {
         setError(e.message);
         Alert.alert(
@@ -600,7 +599,6 @@ export default function ParameterDetails({ route, navigation }) {
     } else if (timeframe === "last7d") {
       return item.x.toLocaleDateString();
     } else if (timeframe === "last30d") {
-      // Find the week number
       const firstDate = data[0].x;
       const weekNumber = Math.floor((item.x.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24 * 7)) + 1;
       return `Week ${weekNumber}`;
