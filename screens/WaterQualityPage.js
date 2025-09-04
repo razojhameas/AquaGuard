@@ -818,7 +818,7 @@ export default function WaterQualityPage({ language, settings }) {
                     fontSize: 18,
                     fontWeight: "bold",
                   }}>
-                    >
+                    &gt;
                   </Text>
                 </Pressable>
               )}
