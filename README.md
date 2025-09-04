@@ -21,6 +21,8 @@ START
 	run in terminal: npx expo start
 	open another terminal, run: node utils/server.js 
 
+		--MAKE SURE--    expo go version supports SDK 51
+
 IF ERROR IN DEPENDENCIES
 
 	run in terminal: 
