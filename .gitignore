@@ -42,5 +42,8 @@ appdetails
 update
 *.log
 
+# Ignore the ESP32 to Server folder
+ESP32toServer/
+
 # VSCode
 .vscode/

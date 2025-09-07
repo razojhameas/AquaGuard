@@ -567,14 +567,14 @@ export default function WaterQualityPage({ language, settings }) {
       </View>
       <View style={styles.glassCard}>
         <Text style={[styles.heading, { marginBottom: 8, fontSize: 22 }]}>
-          {language === "English" ? "WATER QUALITY MONITOR" : "PAGSUBAYBAY NG KALIDAD NG TUBIG"}
+          {language === "English" ? "WATER QUALITY MONITOR" : "KALIDAD NG TUBIG"}
         </Text>
 
         <View style={{ marginBottom: 12, width: "100%", alignItems: "center" }}>
-          <Text style={{ color: "#00796b", fontWeight: "bold", fontSize: 15, marginBottom: 4 }}>
+          <Text style={{ color: "#00796b", fontWeight: "bold", fontSize: 15, marginBottom: 4, textAlign: "center" }}>
             {language === "English"
-              ? "Select Species (for Temperature Fuzzy Logic)"
-              : "Pumili ng Isda (para sa Temperature Fuzzy Logic)"}
+              ? "Select Species \n (for Temperature Fuzzy Logic)"
+              : "Select Species \n (for Temperature Fuzzy Logic)"}
           </Text>
           <View style={{
             borderWidth: 1,
@@ -799,27 +799,19 @@ export default function WaterQualityPage({ language, settings }) {
               {param.nav && (
                 <Pressable
                   style={{
-                    backgroundColor: "#009688",
                     borderRadius: 8,
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
                     marginLeft: 8,
-                    elevation: 2,
                   }}
-                  onPress={() => navigation.navigate(param.nav, {
-                    property: param.property,
-                    title: param.label,
-                    unit: param.unit,
-                    language: language
-                  })}
+                  onPress={() =>
+                    navigation.navigate(param.nav, {
+                      property: param.property,
+                      title: param.label,
+                      unit: param.unit,
+                      language: language,
+                    })
+                  }
                 >
-                  <Text style={{
-                    color: "#fff",
-                    fontSize: 18,
-                    fontWeight: "bold",
-                  }}>
-                    &gt;
-                  </Text>
+                  <Ionicons name="arrow-forward-circle-outline" size={30} color="#00796b" />
                 </Pressable>
               )}
             </View>

@@ -300,7 +300,7 @@ export default function DashboardPage({ language, navigation }) {
         <View style={styles.glassCard}>
           <Text style={styles.header}>AquaGUARD</Text>
           <Text style={styles.subHeader}>
-            {language === "English" ? "System Dashboard" : "Dashboard ng Sistema (clunky pa translations google translate na lang muna, need pa kasi ng langauge expert consulation para formal e wala pa)"}
+            {language === "English" ? "System Dashboard" : "System Dashboard"}
           </Text>
 
           {loading ? (
@@ -404,7 +404,7 @@ export default function DashboardPage({ language, navigation }) {
               </View>
               <View style={styles.cardSection}>
                 <Text style={styles.cardSectionTitle}>
-                  {language === "English" ? "Feeding System" : "Sistema ng Pagpapakain"}
+                  {language === "English" ? "Feeding System" : "Pagpapakain na Sistema"}
                 </Text>
                 {feedingStats && feedingStats.totalFeedDispensed !== undefined ? (
                   <View style={styles.cardSectionContent}>
@@ -426,7 +426,7 @@ export default function DashboardPage({ language, navigation }) {
                     </View>
                     <View style={styles.dataRow}>
                       <Text style={styles.dataLabel}>
-                        {language === "English" ? "Avg. Feed per Feeding:" : "Karaniwang Pakain kada Pagpapakain:"}
+                        {language === "English" ? "Avg. Feed per Feeding:" : "Karaniwang Pakain/Pagpapakain:"}
                       </Text>
                       <Text style={styles.dataValue}>
                         {feedingStats.avgFeedPerFeeding?.toFixed(2) || "--"}

@@ -1,13 +1,13 @@
 {
   "expo": {
-    "name": "GROUPTUBIG",
-    "slug": "GROUPTUBIG",
+    "name": "AquaGuard",
+    "slug": "AquaGuard",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/logo.png",
+    "icon": "./assets/iconsplash.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/icon.png",
+      "image": "./assets/iconsplash.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -16,12 +16,18 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
+        "foregroundImage": "./assets/iconsplash.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.jhames_razo.AquaGuard"
     },
     "web": {
-      "favicon": "./assets/icon.png"
+      "favicon": "./assets/iconsplash.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "0afb8dfd-1cea-4139-85a3-315d7e7473b8"
+      }
     }
   }
 }

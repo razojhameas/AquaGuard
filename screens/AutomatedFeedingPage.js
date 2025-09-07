@@ -323,12 +323,12 @@ export default function AutomatedFeedingPage({ language, settings }) {
     selectFeedType:
       language === "English" ? "Select feed type..." : "Pumili ng uri ng pakain...",
     feedType1: language === "English" ? "Pellets" : "Pellet",
-    feedType2: language === "English" ? "Crumble" : "Mga Piraso",
-    feedType3: language === "English" ? "Custom" : "Pasadyang",
+    feedType2: language === "English" ? "Crumble" : "Crumble",
+    feedType3: language === "English" ? "Custom" : "Custom",
     distributionModeLabel:
-      language === "English" ? "Feed Distribution Mode:" : "Paraan ng Pamamahagi:",
+      language === "English" ? "Feed Distribution Mode:" : "Paraan ng Distribusyon:",
     selectDistributionMode:
-      language === "English" ? "Select distribution mode..." : "Pumili ng paraan ng pamamahagi...",
+      language === "English" ? "Select distribution mode..." : "Pumili ng paraan ng distribusyon...",
     mode1: language === "English" ? "Controlled" : "Kontrolado",
     mode2: language === "English" ? "High" : "Mataas",
     currentRotationsLabel:
@@ -344,7 +344,7 @@ export default function AutomatedFeedingPage({ language, settings }) {
       language === "English"
         ? "Set feed per rotation... (Grams)"
         : "Ilagay ang Pakain Kada Ikot... (Gramo)",
-    applyText: language === "English" ? "Apply" : "Ilapat",
+    applyText: language === "English" ? "Apply" : "Ipatupad",
     defaultText: language === "English" ? "Default" : "Depolt",
     feedingStateLabel:
       language === "English" ? "Feeding System State:" : "Kalagayan ng Sistema ng Pagpapakain:",
