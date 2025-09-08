@@ -14,6 +14,102 @@ import { calculateDOStressIndex } from "../utils/waterQualityCalculations";
 
 const { width, height } = Dimensions.get("window");
 
+// Helper function to calculate fuzzy classification for a given value and sets.
+// Returns an index (0-3) representing the classification: 0 = Good, 1 = Moderate, 2 = Poor, 3 = Bad
+function fuzzyClassify(val, sets) {
+  if (val === undefined || val === null || isNaN(val)) return 1;
+  const triangular = (x, a, b, c) => {
+    if (x <= a || x >= c) return 0;
+    if (x === b) return 1;
+    if (x > a && x < b) return (x - a) / (b - a);
+    if (x > b && x < c) return (c - x) / (c - b);
+    return 0;
+  };
+  let degrees = [0, 0, 0, 0];
+  if (sets.length === 7) { // pH fuzzy sets
+    degrees[0] = triangular(val, ...sets[0]);
+    degrees[1] = Math.max(triangular(val, ...sets[1]), triangular(val, ...sets[2]));
+    degrees[2] = Math.max(triangular(val, ...sets[3]), triangular(val, ...sets[4]));
+    degrees[3] = Math.max(triangular(val, ...sets[5]), triangular(val, ...sets[6]));
+  } else { // Other fuzzy sets
+    for (let i = 0; i < 4; i++) {
+      degrees[i] = triangular(val, ...sets[i]);
+    }
+  }
+  let maxIdx = 0;
+  let maxVal = degrees[0];
+  for (let i = 1; i < degrees.length; i++) {
+    if (degrees[i] > maxVal) {
+      maxVal = degrees[i];
+      maxIdx = i;
+    }
+  }
+  return maxIdx;
+}
+
+const getStatusColor = (statusIndex) => {
+  switch (statusIndex) {
+    case 0: return "#009688"; // Good
+    case 1: return "#f9a825"; // Moderate
+    case 2: return "#e65100"; // Poor
+    case 3: return "#b71c1c"; // Bad
+    default: return "#888"; // Unknown
+  }
+};
+
+const getStatusText = (statusIndex, language) => {
+  const statuses = language === "English"
+    ? ["Good", "Moderate", "Poor", "Bad", "Unknown"]
+    : ["Mabuti", "Katamtaman", "Mahina", "Masama", "Hindi Alam"];
+  return statuses[statusIndex] || statuses[4];
+};
+
+const tempSets = [
+  [26, 29, 32], // Good
+  [22, 24, 26], [32, 34, 35], // Moderate
+  [18, 20, 22], [35, 36, 37], // Poor
+  [0, 15, 18], [37, 40, 50], // Bad
+];
+
+const pHSets = [
+  [6.5, 7.5, 8.5], // Good
+  [5.5, 6, 6.5], [8.5, 8.8, 9.1], // Moderate
+  [4.5, 5, 5.5], [9.1, 9.8, 10.5], // Poor
+  [0, 3, 4.5], [10.5, 12, 14], // Bad
+];
+
+const ammoniaSets = [
+  [0, 0, 0.02], // Good
+  [0.01, 0.035, 0.05], // Moderate
+  [0.04, 0.075, 0.1], // Poor
+  [0.08, 0.1, 1], // Bad
+];
+
+const turbiditySets = [
+  [0, 0, 5], // Good
+  [4, 12.5, 20], // Moderate
+  [18, 35, 50], // Poor
+  [40, 50, 200], // Bad
+];
+
+const calculateOverallPondHealth = (data) => {
+  if (!data) return { statusIndex: 4, statusText: "Unknown", color: "#888" };
+  const tempStatus = fuzzyClassify(data.temperature, tempSets);
+  const pHStatus = fuzzyClassify(data.pH, pHSets);
+  const ammoniaStatus = fuzzyClassify(data.ammoniaLevel, ammoniaSets);
+  const turbidityStatus = fuzzyClassify(data.turbidityLevel, turbiditySets);
+
+  // Use the worst-case scenario (the maximum status index) to determine overall health.
+  const worstIndex = Math.max(tempStatus, pHStatus, ammoniaStatus, turbidityStatus);
+  const finalIndex = worstIndex;
+
+  return {
+    statusIndex: finalIndex,
+    statusText: getStatusText(finalIndex, "English"),
+    color: getStatusColor(finalIndex),
+  };
+};
+
 const styles = StyleSheet.create({
   dashboardPage: {
     flex: 1,
@@ -174,53 +270,38 @@ const styles = StyleSheet.create({
     marginLeft: 6,
     letterSpacing: 0.5,
   },
+  overallHealthCard: {
+    padding: 20,
+    borderRadius: 20,
+    marginBottom: 20,
+    minWidth: 340,
+    maxWidth: 650,
+    width: width > 700 ? 600 : "96%",
+    alignItems: "center",
+  },
+  overallHealthTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#00796b",
+    marginBottom: 12,
+    alignSelf: "flex-start",
+    letterSpacing: 0.5,
+  },
+  overallHealthRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+    paddingVertical: 8,
+  },
 });
-
-const getDOSIColor = (dosi) => {
-  if (dosi === undefined || dosi === null) return "#888";
-  if (dosi > 0.8) return "#b71c1c";
-  if (dosi > 0.6) return "#e65100";
-  if (dosi > 0.3) return "#f9a825";
-  return "#009688";
-};
-
-const getTemperatureColor = (temp) => {
-  if (temp === undefined || temp === null || isNaN(temp)) return "#888";
-  if (temp < 18 || temp > 37) return "#b71c1c";
-  if ((temp >= 18 && temp < 22) || (temp > 35 && temp <= 37)) return "#e65100";
-  if ((temp >= 22 && temp < 26) || (temp > 32 && temp <= 35)) return "#f9a825";
-  return "#009688";
-};
-
-const getPHColor = (pH) => {
-  if (pH === undefined || pH === null || isNaN(pH)) return "#888";
-  if (pH < 4.5 || pH > 10.5) return "#b71c1c";
-  if ((pH >= 4.5 && pH < 5.5) || (pH > 9.1 && pH <= 10.5)) return "#e65100";
-  if ((pH >= 5.5 && pH < 6.5) || (pH > 8.5 && pH <= 9.1)) return "#f9a825";
-  return "#009688";
-};
-
-const getAmmoniaColor = (ammonia) => {
-  if (ammonia === undefined || ammonia === null || isNaN(ammonia)) return "#888";
-  if (ammonia > 0.1) return "#b71c1c";
-  if (ammonia > 0.05) return "#e65100";
-  if (ammonia > 0.02) return "#f9a825";
-  return "#009688";
-};
-
-const getTurbidityColor = (turbidity) => {
-  if (turbidity === undefined || turbidity === null || isNaN(turbidity)) return "#888";
-  if (turbidity > 50) return "#b71c1c";
-  if (turbidity > 20) return "#e65100";
-  if (turbidity > 5) return "#f9a825";
-  return "#009688";
-};
 
 export default function DashboardPage({ language, navigation }) {
   const [loading, setLoading] = useState(true);
   const [latestWaterQuality, setLatestWaterQuality] = useState(null);
   const [feedingStats, setFeedingStats] = useState(null);
   const [doStressIndexResult, setDoStressIndexResult] = useState(null);
+  const [overallPondHealth, setOverallPondHealth] = useState(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -255,14 +336,18 @@ export default function DashboardPage({ language, navigation }) {
                 currentHour
               );
         setDoStressIndexResult(doSI);
+        const healthStatus = calculateOverallPondHealth(waterData);
+        setOverallPondHealth(healthStatus);
       } else {
         setDoStressIndexResult(null);
+        setOverallPondHealth(null);
       }
     } catch (error) {
       console.error("Error fetching data:", error);
       setLatestWaterQuality(null);
       setFeedingStats(null);
       setDoStressIndexResult(null);
+      setOverallPondHealth(null);
     } finally {
       setLoading(false);
     }
@@ -307,6 +392,38 @@ export default function DashboardPage({ language, navigation }) {
             <ActivityIndicator size="large" color="#00796b" />
           ) : (
             <>
+              {overallPondHealth && (
+                <View style={styles.cardSection}>
+                  <Text style={styles.overallHealthTitle}>
+                    {language === "English" ? "Overall Pond Health" : "Pangkalahatang Kalusugan ng Pond"}
+                  </Text>
+                  <View style={styles.overallHealthRow}>
+                    <Text style={styles.dataLabel}>
+                      {language === "English" ? "Status:" : "Katayuan:"}
+                    </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      <View
+                        style={[
+                          styles.statusIndicator,
+                          { backgroundColor: overallPondHealth.color },
+                        ]}
+                      />
+                      <Text
+                        style={[
+                          styles.statusText,
+                          { color: overallPondHealth.color },
+                        ]}
+                      >
+                        {getStatusText(
+                          overallPondHealth.statusIndex,
+                          language
+                        )}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+
               <View style={styles.cardSection}>
                 <Text style={styles.cardSectionTitle}>
                   {language === "English" ? "Water Quality" : "Kalidad ng Tubig"}
@@ -319,13 +436,17 @@ export default function DashboardPage({ language, navigation }) {
                         <View
                           style={[
                             styles.statusIndicator,
-                            { backgroundColor: getDOSIColor(doStressIndexResult?.rawDOSI) },
+                            { backgroundColor: getStatusColor(
+                                fuzzyClassify(doStressIndexResult?.rawDOSI, [[0,0,0.3],[0.2,0.5,0.7],[0.6,0.8,0.9],[0.8,1,1]])
+                               )},
                           ]}
                         />
                         <Text
                           style={[
                             styles.statusText,
-                            { color: getDOSIColor(doStressIndexResult?.rawDOSI) },
+                            { color: getStatusColor(
+                                fuzzyClassify(doStressIndexResult?.rawDOSI, [[0,0,0.3],[0.2,0.5,0.7],[0.6,0.8,0.9],[0.8,1,1]])
+                               )},
                           ]}
                         >
                           {doStressIndexResult?.rawDOSI !== null
@@ -342,7 +463,7 @@ export default function DashboardPage({ language, navigation }) {
                       <Text
                         style={[
                           styles.dataValue,
-                          { color: getTemperatureColor(latestWaterQuality.temperature) },
+                          { color: getStatusColor(fuzzyClassify(latestWaterQuality.temperature, tempSets)) },
                         ]}
                       >
                         {latestWaterQuality.temperature?.toFixed(2) || "--"} °C
@@ -354,7 +475,7 @@ export default function DashboardPage({ language, navigation }) {
                       <Text
                         style={[
                           styles.dataValue,
-                          { color: getPHColor(latestWaterQuality.pH) },
+                          { color: getStatusColor(fuzzyClassify(latestWaterQuality.pH, pHSets)) },
                         ]}
                       >
                         {latestWaterQuality.pH?.toFixed(2) || "--"}
@@ -368,7 +489,7 @@ export default function DashboardPage({ language, navigation }) {
                       <Text
                         style={[
                           styles.dataValue,
-                          { color: getAmmoniaColor(latestWaterQuality.ammoniaLevel) },
+                          { color: getStatusColor(fuzzyClassify(latestWaterQuality.ammoniaLevel, ammoniaSets)) },
                         ]}
                       >
                         {latestWaterQuality.ammoniaLevel?.toFixed(2) || "--"} mg/L
@@ -382,7 +503,7 @@ export default function DashboardPage({ language, navigation }) {
                       <Text
                         style={[
                           styles.dataValue,
-                          { color: getTurbidityColor(latestWaterQuality.turbidityLevel) },
+                          { color: getStatusColor(fuzzyClassify(latestWaterQuality.turbidityLevel, turbiditySets)) },
                         ]}
                       >
                         {latestWaterQuality.turbidityLevel?.toFixed(2) || "--"} NTU
@@ -402,6 +523,7 @@ export default function DashboardPage({ language, navigation }) {
                   </Text>
                 )}
               </View>
+
               <View style={styles.cardSection}>
                 <Text style={styles.cardSectionTitle}>
                   {language === "English" ? "Feeding System" : "Pagpapakain na Sistema"}

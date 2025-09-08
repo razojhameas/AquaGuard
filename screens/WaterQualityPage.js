@@ -77,17 +77,10 @@ const styles = StyleSheet.create({
   modalCard: {
     backgroundColor: "#fff",
     borderRadius: 16,
-    padding: 22,
+    padding: 15,
     minWidth: 300,
     maxWidth: 360,
-    alignItems: "center",
-    maxHeight: "80%",
-  },
-  modalClose: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    padding: 5,
+    maxHeight: '80%',
   },
   movableIndicatorContainer: {
     position: "absolute",
@@ -119,7 +112,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#009688',
   },
   tableHeaderCell: {
-    flex: 1,
+    width: 70,
     padding: 8,
     textAlign: 'center',
     fontWeight: 'bold',
@@ -132,12 +125,25 @@ const styles = StyleSheet.create({
     borderColor: '#e0f7fa',
   },
   tableCell: {
-    flex: 1,
+    width: 70,
     paddingVertical: 10,
     paddingHorizontal: 4,
     textAlign: 'center',
     fontSize: 12,
     color: '#333',
+  },
+  closeButton: {
+    marginTop: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    backgroundColor: '#00796b',
+    borderRadius: 10,
+    alignSelf: 'center',
+  },
+  closeButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });
 
@@ -148,7 +154,7 @@ export default function WaterQualityPage({ language, settings }) {
   const [apiErrorShown, setApiErrorShown] = useState(false);
   const [debugMsg, setDebugMsg] = useState("");
   const [species, setSpecies] = useState("tilapia");
-  const [showLegendModal, setShowLegendModal] = useState(false);
+  const [showFuzzyModal, setShowFuzzyModal] = useState(false);
   const [doStressIndexResult, setDoStressIndexResult] = useState(null);
 
   const [indicatorPosition, setIndicatorPosition] = useState({ x: 0, y: 0 });
@@ -157,7 +163,9 @@ export default function WaterQualityPage({ language, settings }) {
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (event, gestureState) => {
+        return Math.abs(gestureState.dx) > 2 || Math.abs(gestureState.dy) > 2;
+      },
       onPanResponderMove: (event, gestureState) => {
         const newX = lastPosition.current.x + gestureState.dx;
         const newY = lastPosition.current.y + gestureState.dy;
@@ -466,6 +474,47 @@ export default function WaterQualityPage({ language, settings }) {
     }
   }
 
+  const getOverallPondQuality = () => {
+    const doQuality = doStressIndexResult ? doStressIndexResult.rawDOSI : undefined;
+    const paramQualities = {
+      temp: classifyTemperature(temperature),
+      ph: fuzzyClassify(pH, pHFuzzy),
+      ammonia: fuzzyClassify(ammoniaLevel, ammoniaFuzzy),
+      turbidity: fuzzyClassify(turbidityLevel, turbFuzzy),
+    };
+    let hasGood = true;
+    let hasAverage = false;
+    let hasPoor = false;
+    let hasBad = false;
+
+    // Check DO-SI first as it can be critical
+    if (doStressIndexResult) {
+      if (doQuality > 0.8) hasBad = true;
+      else if (doQuality > 0.6) hasPoor = true;
+      else if (doQuality > 0.3) hasAverage = true;
+    } else {
+        hasGood = false; // No data means can't be good.
+    }
+
+    // Check other parameters
+    for (const key in paramQualities) {
+      const q = paramQualities[key];
+      if (q === 3) hasBad = true;
+      else if (q === 2) hasPoor = true;
+      else if (q === 1) hasAverage = true;
+      else if (q !== 0) hasGood = false;
+    }
+
+    // Apply the logical rules
+    if (hasBad) return { label: (language === "English" ? "Bad" : "Masama"), color: legendColors[3] };
+    if (hasPoor) return { label: (language === "English" ? "Poor" : "Mahina"), color: legendColors[2] };
+    if (hasAverage) return { label: (language === "English" ? "Average" : "Katamtaman"), color: legendColors[1] };
+    if (hasGood) return { label: (language === "English" ? "Good" : "Maganda"), color: legendColors[0] };
+    return { label: "--", color: "#888" };
+  };
+
+  const overallQuality = getOverallPondQuality();
+
   const checkForAlert = () => {
     let criticalParameter = false;
     if (
@@ -496,7 +545,7 @@ export default function WaterQualityPage({ language, settings }) {
     if (data) checkForAlert();
   }, [data, species, settings?.notificationsEnabled, doStressIndexResult]);
 
- const parameters = [
+  const parameters = [
     {
       label: language === "English" ? "DO-SI" : "DO-SI",
       property: "dosi",
@@ -540,8 +589,57 @@ export default function WaterQualityPage({ language, settings }) {
   ];
 
   const legendLabels = language === "English"
-    ? ["Good", "Moderate", "Poor", "Bad"]
+    ? ["Good", "Average", "Poor", "Bad"]
     : ["Maganda", "Katamtaman", "Mahina", "Masama"];
+
+  const getNextSpecies = () => {
+    const currentIndex = speciesOptions.findIndex(s => s.value === species);
+    const nextIndex = (currentIndex + 1) % speciesOptions.length;
+    return speciesOptions[nextIndex].value;
+  };
+
+  const handleQuickSwitch = () => {
+    setSpecies(getNextSpecies());
+  };
+
+  // Fuzzy Logic Data for Modal
+  const fuzzyData = [
+    {
+      parameter: 'pH',
+      good: '6.5 - 8.5',
+      moderate: '6.0 - 6.8 and 8.2 - 8.9',
+      poor: '5.5 - 6.2 and 8.8 - 9.5',
+      bad: '< 5.5 or > 9.5',
+    },
+    {
+      parameter: 'Temperature (°C)',
+      good: '26°C - 29°C',
+      moderate: '22°C - 26°C or 29°C - 31°C',
+      poor: '18°C - 22°C or 31°C - 34°C',
+      bad: '<18°C or >35°C',
+    },
+    {
+      parameter: 'Dissolved Oxygen (ppm)',
+      good: '≥ 4.5',
+      moderate: '2.5 - 4.0',
+      poor: '2.0 - 2.9',
+      bad: '<2.0',
+    },
+    {
+      parameter: 'Turbidity (NTU)',
+      good: '0 - 15',
+      moderate: '10 - 30',
+      poor: '21 - 50',
+      bad: '>50',
+    },
+    {
+      parameter: 'Ammonia (mg/L)',
+      good: '≤ 0.02',
+      moderate: '0.03 - 0.07',
+      poor: '0.06 - 0.1',
+      bad: '>0.1',
+    },
+  ];
 
   return (
     <View style={styles.waterQualityPage}>
@@ -573,27 +671,54 @@ export default function WaterQualityPage({ language, settings }) {
         <View style={{ marginBottom: 12, width: "100%", alignItems: "center" }}>
           <Text style={{ color: "#00796b", fontWeight: "bold", fontSize: 15, marginBottom: 4, textAlign: "center" }}>
             {language === "English"
-              ? "Select Species \n (for Temperature Fuzzy Logic)"
-              : "Select Species \n (for Temperature Fuzzy Logic)"}
+              ? "Selected Species"
+              : "Napiling Isda"}
           </Text>
           <View style={{
-            borderWidth: 1,
-            borderColor: "#00796b",
-            borderRadius: 10,
-            backgroundColor: "#f7f8fc",
-            width: 220,
-            alignSelf: "center",
-            marginBottom: 2,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: "100%",
           }}>
-            <Picker
-              selectedValue={species}
-              onValueChange={setSpecies}
-              style={{ width: "100%" }}
+            <Pressable
+              onPress={handleQuickSwitch}
+              style={{
+                padding: 10,
+                borderRadius: 10,
+                backgroundColor: 'rgba(0, 121, 107, 0.1)',
+                marginRight: 10,
+              }}
             >
-              {speciesOptions.map(opt => (
-                <Picker.Item key={opt.value} label={opt.label} value={opt.value} />
-              ))}
-            </Picker>
+              <Ionicons name="swap-horizontal-outline" size={24} color="#00796b" />
+            </Pressable>
+            <View style={{
+              flex: 1,
+              borderWidth: 1,
+              borderColor: "#00796b",
+              borderRadius: 10,
+              backgroundColor: "#f7f8fc",
+            }}>
+              <Picker
+                selectedValue={species}
+                onValueChange={setSpecies}
+                style={{ width: "100%" }}
+              >
+                {speciesOptions.map(opt => (
+                  <Picker.Item key={opt.value} label={opt.label} value={opt.value} />
+                ))}
+              </Picker>
+            </View>
+            <Pressable
+              onPress={() => setShowFuzzyModal(true)}
+              style={{
+                padding: 10,
+                borderRadius: 10,
+                backgroundColor: 'rgba(0, 121, 107, 0.1)',
+                marginLeft: 10,
+              }}
+            >
+              <Ionicons name="information-circle-outline" size={24} color="#00796b" />
+            </Pressable>
           </View>
           <Text style={{ fontSize: 12, color: "#888", marginTop: 2 }}>
             {language === "English"
@@ -604,14 +729,13 @@ export default function WaterQualityPage({ language, settings }) {
         <View style={{
           flexDirection: "row",
           alignItems: "center",
+          justifyContent: "center",
           marginBottom: 18,
         }}>
           {legendLabels.map((legend, idx) => (
-            <TouchableOpacity
+            <View
               key={legend}
               style={{ flexDirection: "row", alignItems: "center" }}
-              onPress={() => setShowLegendModal(true)}
-              activeOpacity={0.7}
             >
               <View style={{
                 width: 12, height: 12, borderRadius: 6,
@@ -632,101 +756,65 @@ export default function WaterQualityPage({ language, settings }) {
               }}>
                 {legend}
               </Text>
-            </TouchableOpacity>
+            </View>
           ))}
         </View>
 
         <Modal
-          visible={showLegendModal}
+          visible={showFuzzyModal}
           animationType="fade"
           transparent
-          onRequestClose={() => setShowLegendModal(false)}
+          onRequestClose={() => setShowFuzzyModal(false)}
         >
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalCard, { backgroundColor: "#fff", alignItems: "center", padding: 0 }]}>
-              <TouchableOpacity
-                style={{
-                  position: "absolute",
-                  top: 10,
-                  right: 10,
-                  zIndex: 100,
-                  padding: 8,
-                }}
-                onPress={() => setShowLegendModal(false)}
-              >
-                <Ionicons name="close" size={28} color="#3a3fbd" />
-              </TouchableOpacity>
-              <View style={styles.legendTable}>
-                <View style={styles.tableHeaderRow}>
-                  <Text style={[styles.tableHeaderCell, { flex: 1.5 }]}>
-                    {language === "English" ? "Parameter" : "Parameter"}
-                  </Text>
-                  <Text style={styles.tableHeaderCell}>
-                    {legendLabels[0]}
-                  </Text>
-                  <Text style={styles.tableHeaderCell}>
-                    {legendLabels[1]}
-                  </Text>
-                  <Text style={styles.tableHeaderCell}>
-                    {legendLabels[2]}
-                  </Text>
-                  <Text style={styles.tableHeaderCell}>
-                    {legendLabels[3]}
-                  </Text>
-                </View>
-                <ScrollView contentContainerStyle={{ paddingBottom: 10 }}>
-                  <View style={[styles.tableRow, { backgroundColor: '#fff' }]}>
-                    <Text style={[styles.tableCell, { flex: 1.5 }]}>pH</Text>
-                    <Text style={styles.tableCell}>6.5 - 8.5</Text>
-                    <Text style={styles.tableCell}>5.5-6.4{'\n'}8.6-9.0</Text>
-                    <Text style={styles.tableCell}>4.5-5.4{'\n'}9.1-10.5</Text>
-                    <Text style={styles.tableCell}>{"<4.5\n>10.5"}</Text>
-                  </View>
-                  <View style={[styles.tableRow, { backgroundColor: '#f7f8fc' }]}>
-                    <Text style={[styles.tableCell, { flex: 1.5 }]}>
-                      {language === "English" ? "Temperature" : "Temperatura"}
-                    </Text>
-                    <Text style={styles.tableCell}>
-                      {language === "English" ? "Species Optimal" : "Pinakamainam ng Isda"}
-                    </Text>
-                    <Text style={styles.tableCell}>
-                      {language === "English" ? "Slight deviation" : "Bahagyang labis/kulang"}
-                    </Text>
-                    <Text style={styles.tableCell}>
-                      {language === "English" ? "Significant deviation" : "Malaking labis/kulang"}
-                    </Text>
-                    <Text style={styles.tableCell}>
-                      {language === "English" ? "Extreme" : "Sobrang labis/kulang"}
-                    </Text>
-                  </View>
-                  <View style={[styles.tableRow, { backgroundColor: '#fff' }]}>
-                    <Text style={[styles.tableCell, { flex: 1.5 }]}>
-                      {language === "English" ? "DO-SI" : "DO-SI"}
-                    </Text>
-                    <Text style={styles.tableCell}>{"<0.3"}</Text>
-                    <Text style={styles.tableCell}>0.3 - 0.6</Text>
-                    <Text style={styles.tableCell}>0.6 - 0.8</Text>
-                    <Text style={styles.tableCell}>{">0.8"}</Text>
-                  </View>
-                  <View style={[styles.tableRow, { backgroundColor: '#f7f8fc' }]}>
-                    <Text style={[styles.tableCell, { flex: 1.5 }]}>
-                      {language === "English" ? "Turbidity (NTU)" : "Kakuliman (NTU)"}
-                    </Text>
-                    <Text style={styles.tableCell}>0 - 5</Text>
-                    <Text style={styles.tableCell}>6 - 20</Text>
-                    <Text style={styles.tableCell}>21 - 50</Text>
-                    <Text style={styles.tableCell}>{">50"}</Text>
-                  </View>
-                  <View style={[styles.tableRow, { backgroundColor: '#fff' }]}>
-                    <Text style={[styles.tableCell, { flex: 1.5 }]}>
-                      {language === "English" ? "Ammonia (mg/L)" : "Amonya (mg/L)"}
-                    </Text>
-                    <Text style={styles.tableCell}>{"\u2264 0.02"}</Text>
-                    <Text style={styles.tableCell}>0.03 - 0.05</Text>
-                    <Text style={styles.tableCell}>0.06 - 0.1</Text>
-                    <Text style={styles.tableCell}>{">0.1"}</Text>
+            <View style={[styles.modalCard]}>
+              <View style={{ paddingBottom: 20 }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+                  <View style={styles.legendTable}>
+                    <View style={styles.tableHeaderRow}>
+                      <Text style={[styles.tableHeaderCell, { width: 90 }]}>
+                        {language === "English" ? "Parameter" : "Parameter"}
+                      </Text>
+                      <Text style={styles.tableHeaderCell}>
+                        {legendLabels[0]}
+                      </Text>
+                      <Text style={styles.tableHeaderCell}>
+                        {legendLabels[1]}
+                      </Text>
+                      <Text style={styles.tableHeaderCell}>
+                        {legendLabels[2]}
+                      </Text>
+                      <Text style={styles.tableHeaderCell}>
+                        {legendLabels[3]}
+                      </Text>
+                    </View>
+                    <View>
+                      {fuzzyData.map((data, idx) => (
+                        <View
+                          key={data.parameter}
+                          style={[
+                            styles.tableRow,
+                            { backgroundColor: idx % 2 === 0 ? '#fff' : '#f7f8fc' },
+                          ]}
+                        >
+                          <Text style={[styles.tableCell, { width: 90 }]}>
+                            {data.parameter}
+                          </Text>
+                          <Text style={styles.tableCell}>{data.good}</Text>
+                          <Text style={styles.tableCell}>{data.moderate}</Text>
+                          <Text style={styles.tableCell}>{data.poor}</Text>
+                          <Text style={styles.tableCell}>{data.bad}</Text>
+                        </View>
+                      ))}
+                    </View>
                   </View>
                 </ScrollView>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={() => setShowFuzzyModal(false)}
+                >
+                  <Text style={styles.closeButtonText}>{language === "English" ? "Close" : "Isara"}</Text>
+                </TouchableOpacity>
               </View>
             </View>
           </View>
@@ -743,6 +831,58 @@ export default function WaterQualityPage({ language, settings }) {
           contentContainerStyle={{ padding: 10 }}
           showsVerticalScrollIndicator={false}
         >
+          {/* Overall Quality Card */}
+          <View style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 14,
+            backgroundColor: "#fff",
+            borderRadius: 14,
+            paddingVertical: 14,
+            paddingHorizontal: 14,
+            shadowColor: overallQuality.color,
+            shadowOpacity: 0.10,
+            shadowRadius: 8,
+            shadowOffset: { width: 0, height: 2 },
+            elevation: 2,
+            borderWidth: 1.5,
+            borderColor: overallQuality.color,
+            minHeight: 54,
+          }}>
+            <View style={{ flexDirection: "row", alignItems: "center", minWidth: 90 }}>
+              <View style={{
+                width: 7,
+                height: 36,
+                borderRadius: 3,
+                backgroundColor: overallQuality.color,
+                marginRight: 10,
+              }} />
+              <Text
+                style={{
+                  fontSize: 16,
+                  color: "#3a3fbd",
+                  fontWeight: "bold",
+                  flexShrink: 1,
+                }}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {language === "English" ? "Overall Pond Quality" : "Pangkalahatang Kalidad ng Pond"}
+              </Text>
+            </View>
+            <Text style={{
+              fontSize: 17,
+              color: overallQuality.color,
+              fontWeight: "bold",
+              minWidth: 60,
+              textAlign: "right"
+            }}>
+              {overallQuality.label}
+            </Text>
+          </View>
+          {/* End Overall Quality Card */}
+          
           {parameters.map((param, idx) => (
             <View
               key={param.label}
