@@ -21,7 +21,7 @@ function thresholdPenalty(value, thresholdLow, thresholdHigh) {
 }
 
 function timeMultiplier(hour) {
-  // Smooth multiplier between 22:00 and 6:00, peak at 4:00 (max multiplier 3)
+  // smooth multiplier between 22:00 and 6:00, peak sa 4:00 (max multiplier 3)
   const peakHour = 4;
   const startHour = 22;
   const endHour = 6;
@@ -54,11 +54,11 @@ export function calculateDOStressIndex(temperature, pH, ammonia, turbidity, hour
   const ammoniaSmoothed = movingAverage(recentAms, smoothPeriod);
   const turbiditySmoothed = movingAverage(recentTurbs, smoothPeriod);
 
-  const tempFactor = normalize(tempSmoothed, 20, 35); // °C range
+  const tempFactor = normalize(tempSmoothed, 20, 35); 
   const pHDeviation = Math.abs(pHSmoothed - 7.5);
   const pHFactor = Math.min(1, pHDeviation / 2.5);
-  const ammoniaFactor = normalize(ammoniaSmoothed, 0.05, 0.5); // mg/L
-  const turbidityFactor = normalize(turbiditySmoothed, 10, 100); // NTU
+  const ammoniaFactor = normalize(ammoniaSmoothed, 0.05, 0.5); 
+  const turbidityFactor = normalize(turbiditySmoothed, 10, 100); 
 
   const tempPenalty = thresholdPenalty(tempSmoothed, 20, 32);
   const pHPenalty = thresholdPenalty(pHSmoothed, 6.5, 9);

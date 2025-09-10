@@ -10,21 +10,30 @@ mongoose.connect(
   "mongodb+srv://razojhames8:TubigDSTF25@cluster0.2atsy.mongodb.net/mydatabase?retryWrites=true&w=majority&appName=Cluster0"
 );
 
+const log = (message, data) => {
+  const timestamp = new Date().toISOString();
+  let logMessage = `[${timestamp}] ${message}`;
+
+  if (message.includes("ERROR")) {
+    logMessage = `\x1b[31m${logMessage}\x1b[0m`; 
+    console.error(logMessage, data ? JSON.stringify(data, null, 2) : "");
+  } else if (message.includes("POST") || message.includes("GET")) {
+    logMessage = `\x1b[34m${logMessage}\x1b[0m`; 
+    console.log(logMessage, data ? JSON.stringify(data, null, 2) : "");
+  } else {
+    logMessage = `\x1b[32m${logMessage}\x1b[0m`;
+    console.log(logMessage, data ? JSON.stringify(data, null, 2) : "");
+  }
+};
+
 mongoose.connection.on("connected", () => {
   log("Connected to MongoDB Atlas");
 });
 mongoose.connection.on("error", (err) => {
-  console.error("MongoDB connection error:", err);
+  log("ERROR: MongoDB connection error", err.message);
 });
 
-// helper para sa logging
-const log = (message, data) => {
-  const timestamp = new Date().toISOString();
-  console.log(`[${timestamp}] ${message}`, data ? JSON.stringify(data) : "");
-};
-
-// schemas
-const waterQualitySchema = new mongoose.Schema({
+const WaterQualityDataSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
   temperature: Number,
   pH: Number,
@@ -32,9 +41,9 @@ const waterQualitySchema = new mongoose.Schema({
   ammoniaLevel: Number,
   turbidityLevel: Number,
 });
-const WaterQuality = mongoose.model("WaterQuality", waterQualitySchema);
+const WaterQuality = mongoose.model("WaterQualityData", WaterQualityDataSchema);
 
-const feedingSettingsSchema = new mongoose.Schema({
+const AutomatedFeedingSettingsSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
   isFeeding: { type: Boolean, default: false },
   rotations: { type: Number, default: 6 },
@@ -43,24 +52,23 @@ const feedingSettingsSchema = new mongoose.Schema({
   distributionMode: { type: String, default: "" },
   scheduleTimes: { type: [String], default: [] },
 });
-const FeedingSettings = mongoose.model("FeedingSettings", feedingSettingsSchema);
+const FeedingSettings = mongoose.model("AutomatedFeedingSettings", AutomatedFeedingSettingsSchema);
 
-const feedingStatsSchema = new mongoose.Schema({
+const FeedingStatisticsSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
   totalFeedDispensed: { type: Number, default: 0 },
   totalFeedings: { type: Number, default: 0 },
   lastFeedingTime: { type: Date, default: null },
   avgFeedPerFeeding: { type: Number, default: 0 },
 });
-const FeedingStats = mongoose.model("FeedingStats", feedingStatsSchema);
+const FeedingStats = mongoose.model("FeedingStatistics", FeedingStatisticsSchema);
 
-const weightSchema = new mongoose.Schema({
+const FishWeightMeasurementSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
   weight: Number,
 });
-const Weight = mongoose.model("Weight", weightSchema);
+const Weight = mongoose.model("FishWeightMeasurement", FishWeightMeasurementSchema);
 
-// helpers
 const convertTo12HourFormat = (time24) => {
   if (!time24) return null;
   const [hours, minutes] = time24.split(":");
@@ -73,6 +81,10 @@ const convertTo12HourFormat = (time24) => {
 const updateFeedingStats = async () => {
   try {
     const latestSettings = await FeedingSettings.findOne().sort({ timestamp: -1 });
+    if (!latestSettings) {
+      log("No feeding settings found to update stats. Skipping.");
+      return;
+    }
     const { rotations, feedPerRotation } = latestSettings;
     const feedDispensed = rotations * feedPerRotation;
 
@@ -90,11 +102,11 @@ const updateFeedingStats = async () => {
     await stats.save();
     log("Feeding statistics updated successfully.");
   } catch (err) {
-    console.error("Error updating feeding stats:", err);
+    log("ERROR: Error updating feeding stats", err.message);
   }
 };
 
-// ---------------------------------- mga API Endpoints ---------------------------------- //
+// ---------------------------------- API Endpoints ---------------------------------- //
 
 // water quality
 app.post("/api/data", async (req, res) => {
@@ -104,7 +116,7 @@ app.post("/api/data", async (req, res) => {
     await doc.save();
     res.json({ message: "Water quality data saved successfully" });
   } catch (err) {
-    console.error("[ERROR] /api/data", err);
+    log("ERROR: /api/data", err.message);
     res.status(500).json({ message: "Error saving water quality data" });
   }
 });
@@ -115,7 +127,7 @@ app.get("/api/data/latest", async (req, res) => {
     const latest = await WaterQuality.findOne().sort({ timestamp: -1 });
     res.json(latest || {});
   } catch (err) {
-    console.error("[ERROR] /api/data/latest", err);
+    log("ERROR: /api/data/latest", err.message);
     res.status(500).json({ message: "Error retrieving latest data" });
   }
 });
@@ -126,12 +138,12 @@ app.get("/api/data", async (req, res) => {
     const data = await WaterQuality.find().sort({ timestamp: 1 });
     res.json(data);
   } catch (err) {
-    console.error("[ERROR] /api/data", err);
+    log("ERROR: /api/data", err.message);
     res.status(500).json({ message: "Error retrieving data" });
   }
 });
 
-// weight sensor endpoints (para sa feed amount, still theorethical)
+// weight sensor endpoints
 app.get("/api/weight", async (req, res) => {
   log("[GET] /api/weight");
   try {
@@ -139,7 +151,7 @@ app.get("/api/weight", async (req, res) => {
     if (latest) res.json({ weight: latest.weight });
     else res.status(404).json({ message: "No weight data found" });
   } catch (err) {
-    console.error("[ERROR] /api/weight", err);
+    log("ERROR: /api/weight", err.message);
     res.status(500).json({ message: "Error retrieving weight data" });
   }
 });
@@ -151,19 +163,19 @@ app.post("/api/weight", async (req, res) => {
     await doc.save();
     res.json({ message: "Weight data received and saved successfully" });
   } catch (err) {
-    console.error("[ERROR] /api/weight", err);
+    log("ERROR: /api/weight", err.message);
     res.status(500).json({ message: "Error saving weight data" });
   }
 });
 
-// feeding system settings
+// Feeding system settings
 app.get("/api/rotations", async (req, res) => {
   log("[GET] /api/rotations");
   try {
     const latest = await FeedingSettings.findOne().sort({ timestamp: -1 });
     res.json({ rotations: latest?.rotations ?? 6 });
   } catch (err) {
-    console.error("[ERROR] /api/rotations", err);
+    log("ERROR: /api/rotations", err.message);
     res.status(500).json({ message: "Error retrieving rotations" });
   }
 });
@@ -174,7 +186,7 @@ app.get("/api/feedperrotation", async (req, res) => {
     const latest = await FeedingSettings.findOne().sort({ timestamp: -1 });
     res.json({ feedPerRotation: latest?.feedPerRotation ?? 0 });
   } catch (err) {
-    console.error("[ERROR] /api/feedperrotation", err);
+    log("ERROR: /api/feedperrotation", err.message);
     res.status(500).json({ message: "Error retrieving feed per rotation" });
   }
 });
@@ -185,7 +197,7 @@ app.get("/api/feedtype", async (req, res) => {
     const latest = await FeedingSettings.findOne().sort({ timestamp: -1 });
     res.json({ feedType: latest?.feedType ?? "" });
   } catch (err) {
-    console.error("[ERROR] /api/feedtype", err);
+    log("ERROR: /api/feedtype", err.message);
     res.status(500).json({ message: "Error retrieving feed type" });
   }
 });
@@ -201,7 +213,7 @@ app.post("/api/feedtype", async (req, res) => {
     );
     res.json({ message: "Feed type updated successfully" });
   } catch (err) {
-    console.error("[ERROR] /api/feedtype", err);
+    log("ERROR: /api/feedtype", err.message);
     res.status(500).json({ message: "Error updating feed type" });
   }
 });
@@ -212,7 +224,7 @@ app.get("/api/distributionmode", async (req, res) => {
     const latest = await FeedingSettings.findOne().sort({ timestamp: -1 });
     res.json({ distributionMode: latest?.distributionMode ?? "" });
   } catch (err) {
-    console.error("[ERROR] /api/distributionmode", err);
+    log("ERROR: /api/distributionmode", err.message);
     res.status(500).json({ message: "Error retrieving distribution mode" });
   }
 });
@@ -228,7 +240,7 @@ app.post("/api/distributionmode", async (req, res) => {
     );
     res.json({ message: "Distribution mode updated successfully" });
   } catch (err) {
-    console.error("[ERROR] /api/distributionmode", err);
+    log("ERROR: /api/distributionmode", err.message);
     res.status(500).json({ message: "Error updating distribution mode" });
   }
 });
@@ -239,7 +251,7 @@ app.get("/api/feedingtoggle", async (req, res) => {
     const latest = await FeedingSettings.findOne().sort({ timestamp: -1 });
     res.json({ isFeeding: latest?.isFeeding ?? false });
   } catch (err) {
-    console.error("[ERROR] /api/feedingtoggle", err);
+    log("ERROR: /api/feedingtoggle", err.message);
     res.status(500).json({ message: "Error retrieving feeding toggle state" });
   }
 });
@@ -258,7 +270,7 @@ app.post("/api/feedingtoggle", async (req, res) => {
     }
     res.json({ message: "Feeding toggle state updated successfully" });
   } catch (err) {
-    console.error("[ERROR] /api/feedingtoggle", err);
+    log("ERROR: /api/feedingtoggle", err.message);
     res.status(500).json({ message: "Error updating feeding toggle state" });
   }
 });
@@ -270,7 +282,7 @@ app.get("/api/feeding-schedules", async (req, res) => {
     const schedules = latest?.scheduleTimes ?? [];
     res.json({ scheduleTimes: schedules });
   } catch (err) {
-    console.error("[ERROR] /api/feeding-schedules", err);
+    log("ERROR: /api/feeding-schedules", err.message);
     res.status(500).json({ message: "Error retrieving feeding schedules" });
   }
 });
@@ -279,6 +291,9 @@ app.post("/api/feeding-schedules", async (req, res) => {
   log("[POST] /api/feeding-schedules", req.body);
   try {
     const { scheduleTimes } = req.body;
+    if (!scheduleTimes || !Array.isArray(scheduleTimes))
+      return res.status(400).json({ message: "Invalid schedule times" });
+
     await FeedingSettings.findOneAndUpdate(
       {},
       { $set: { scheduleTimes, timestamp: new Date() } },
@@ -286,7 +301,7 @@ app.post("/api/feeding-schedules", async (req, res) => {
     );
     res.json({ message: "Feeding schedules updated successfully" });
   } catch (err) {
-    console.error("[ERROR] /api/feeding-schedules", err);
+    log("ERROR: /api/feeding-schedules", err.message);
     res.status(500).json({ message: "Error updating feeding schedules" });
   }
 });
@@ -311,7 +326,7 @@ app.post("/api/feeding-settings", async (req, res) => {
       res.status(400).json({ message: "No valid settings provided." });
     }
   } catch (err) {
-    console.error("[ERROR] /api/feeding-settings", err);
+    log("ERROR: /api/feeding-settings", err.message);
     res.status(500).json({ message: "Error updating feeding settings" });
   }
 });
@@ -323,12 +338,12 @@ app.get("/api/feeding-stats", async (req, res) => {
     const latest = await FeedingStats.findOne().sort({ timestamp: -1 });
     res.json(latest || {});
   } catch (err) {
-    console.error("[ERROR] /api/feeding-stats", err);
+    log("ERROR: /api/feeding-stats", err.message);
     res.status(500).json({ message: "Error retrieving feeding stats" });
   }
 });
 
-// --- demo import pa ig, no implemnted file type restrictions yet ---
+// --- demo import, no implemented file type restrictions yet ---
 
 // import feeding settings
 app.post("/api/import/feeding-settings", async (req, res) => {
@@ -344,7 +359,7 @@ app.post("/api/import/feeding-settings", async (req, res) => {
     );
     res.json({ message: "Feeding settings imported successfully" });
   } catch (err) {
-    console.error("[ERROR] /api/import/feeding-settings", err);
+    log("ERROR: /api/import/feeding-settings", err.message);
     res.status(500).json({ message: "Error importing feeding settings" });
   }
 });
@@ -363,7 +378,7 @@ app.post("/api/import/feeding-stats", async (req, res) => {
     );
     res.json({ message: "Feeding stats imported successfully" });
   } catch (err) {
-    console.error("[ERROR] /api/import/feeding-stats", err);
+    log("ERROR: /api/import/feeding-stats", err.message);
     res.status(500).json({ message: "Error importing feeding stats" });
   }
 });
@@ -383,7 +398,7 @@ app.post("/api/import/feeding-schedules", async (req, res) => {
     );
     res.json({ message: "Feeding schedules imported successfully" });
   } catch (err) {
-    console.error("[ERROR] /api/import/feeding-schedules", err);
+    log("ERROR: /api/import/feeding-schedules", err.message);
     res.status(500).json({ message: "Error importing feeding schedules" });
   }
 });
@@ -401,7 +416,7 @@ app.post("/api/import/water-quality", async (req, res) => {
     );
     res.json({ message: "Water quality data imported successfully" });
   } catch (err) {
-    console.error("[ERROR] /api/import/water-quality", err);
+    log("ERROR: /api/import/water-quality", err.message);
     res.status(500).json({ message: "Error importing water quality data" });
   }
 });
@@ -418,7 +433,7 @@ app.post("/api/import/weight", async (req, res) => {
     );
     res.json({ message: "Weight data imported successfully" });
   } catch (err) {
-    console.error("[ERROR] /api/import/weight", err);
+    log("ERROR: /api/import/weight", err.message);
     res.status(500).json({ message: "Error importing weight data" });
   }
 });
@@ -481,22 +496,22 @@ app.listen(port, "0.0.0.0", async () => {
   log(`Server started on port ${port}`);
   try {
     await initializePersistentData();
-    log("[Startup] Persistent data initialized.");
+    log("Persistent data initialized.");
   } catch (err) {
-    console.error("[Startup] Error initializing data:", err);
+    log("ERROR: Error initializing data", err.message);
   }
 
   setInterval(async () => {
     try {
       await insertSampleWaterQualityAndWeight();
-      log("[Interval] Sample data inserted for water quality and weight.");
+      log("Sample data inserted for water quality and weight.");
     } catch (err) {
-      console.error("[Interval] Error inserting sample data:", err);
+      log("ERROR: Error inserting sample data", err.message);
     }
   }, 5000);
 });
 
-// --- data export ganggang ---
+// --- data export ---
 app.get("/api/export", async (req, res) => {
   log("[GET] /api/export");
   try {
@@ -512,7 +527,7 @@ app.get("/api/export", async (req, res) => {
       weight_logs: weight,
     });
   } catch (err) {
-    console.error("[ERROR] /api/export", err);
+    log("ERROR: /api/export", err.message);
     res.status(500).json({ message: "Error exporting data", error: err.message });
   }
 });
