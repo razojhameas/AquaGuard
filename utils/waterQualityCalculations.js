@@ -1,4 +1,4 @@
-// To store recent measurements for smoothing
+// stores recent measures para smoothing
 const recentTemps = [];
 const recentpHs = [];
 const recentAms = [];
